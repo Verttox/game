@@ -8,6 +8,8 @@
         "ypos" "2"
         "labelText" "#MOM_RunFlag_Input"
         "auto_wide_tocontents" "1"
+		"visible"		"0"
+		"enabled"		"0"
     }
 
     "ScrollOnly"
@@ -25,6 +27,8 @@
         "Font"			"BigNoodleSmall"
         "keyboardinputenabled" "1"
         "mouseinputenabled" "1"
+		"visible"		"0"
+		"enabled"		"0"
     }
     
     // Auto is when scroll isn't selected
@@ -37,6 +41,8 @@
         "ypos" "30"
         "labelText" "#MOM_RunFlag_Movement"
         "auto_wide_tocontents" "1"
+		"visible"		"0"
+		"enabled"		"0"
     }
     
     "WOnly"
@@ -54,6 +60,8 @@
         "Font"			"BigNoodleSmall"
         "keyboardinputenabled" "1"
         "mouseinputenabled" "1"
+		"visible"		"0"
+		"enabled"		"0"
     }
     
     "HalfSideways"
@@ -71,6 +79,8 @@
         "Font"			"BigNoodleSmall"
         "keyboardinputenabled" "1"
         "mouseinputenabled" "1"
+		"visible"		"0"
+		"enabled"		"0"
     }
     
     "Sideways"
@@ -88,6 +98,8 @@
         "Font"			"BigNoodleSmall"
         "keyboardinputenabled" "1"
         "mouseinputenabled" "1"
+		"visible"		"0"
+		"enabled"		"0"
     }
     
     "Backwards"
@@ -105,6 +117,8 @@
         "Font"			"BigNoodleSmall"
         "keyboardinputenabled" "1"
         "mouseinputenabled" "1"
+		"visible"		"0"
+		"enabled"		"0"
     }
     
     "Bonus"
@@ -122,6 +136,8 @@
         "Font"			"BigNoodleSmall"
         "keyboardinputenabled" "1"
         "mouseinputenabled" "1"
+		"visible"		"0"
+		"enabled"		"0"
     }
 
     "Reset"
@@ -139,5 +155,7 @@
         "Font"			"BigNoodleSmall"
         "keyboardinputenabled" "1"
         "mouseinputenabled" "1"
+		"visible"		"0"
+		"enabled"		"0"
     }
 }
