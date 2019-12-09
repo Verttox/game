@@ -4,6 +4,11 @@
 	{
 		"ControlName"		"CMomentumSettingsPanel"
 		"fieldName"		"CMomentumSettingsPanel"
+		"wide" "f253"
+		"tall" "f175"
+		"xpos"		"237"
+		"ypos"		"115"
+		"zpos"		"0"
 		"autoResize"		"0"
 		"pinCorner"		"0"
 		"RoundedCorners"		"15"

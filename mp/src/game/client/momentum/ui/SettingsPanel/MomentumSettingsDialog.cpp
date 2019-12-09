@@ -43,9 +43,6 @@ CMomentumSettingsDialog::CMomentumSettingsDialog(VPANEL parent) : BaseClass(null
     LoadControlSettings("resource/ui/SettingsPanel_Base.res");
     SetKeyBoardInputEnabled(true);
     SetMouseInputEnabled(true);
-
-    SetMinimumSize(GetScaledVal(400), GetScaledVal(260));
-    SetSize(GetScaledVal(400), GetScaledVal(260));
     SetApplyButtonVisible(true);
     SetTitleBarVisible(true);
     SetMenuButtonResponsive(false);
@@ -90,7 +87,6 @@ void CMomentumSettingsDialog::Activate()
 {
     BaseClass::Activate();
 
-    MoveToCenterOfScreen();
     //Let the comparisons settings page/replay model panel know so they can show back up
     if (GetActivePage())
         PostMessage(GetActivePage(), new KeyValues("OnMainDialogShow"));
