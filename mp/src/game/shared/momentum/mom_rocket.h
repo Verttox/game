@@ -20,6 +20,7 @@ class CMomRocket : public CBaseProjectile
     CNetworkVector(m_vInitialVelocity);
 
     CMomRocket();
+    ~CMomRocket();
 
 #ifdef CLIENT_DLL
     virtual int DrawModel(int flags) OVERRIDE;
@@ -48,10 +49,11 @@ class CMomRocket : public CBaseProjectile
 
     CHandle<CMomentumRocketLauncher> m_hOwner;
 
-    static CMomRocket *EmitRocket(const Vector &vecOrigin, const QAngle &vecAngles, CBaseEntity *pentOwner = nullptr);
+    static CMomRocket *EmitRocket(const Vector &vecOrigin, const QAngle &vecAngles, CBaseEntity *pOwner);
 
   protected:
     void CreateSmokeTrail();
+    void CreateRocketExplosionEffect(trace_t *pTrace, CBaseEntity *pOther);
 
     CHandle<RocketTrail> m_hRocketTrail;
     float m_flDamage;
@@ -66,5 +68,6 @@ public:
     void SetThrower(CBaseEntity *pThrower) { m_hThrower = pThrower; }
 
 protected:
+    bool UseTFTrail();
     CBaseEntity* m_hThrower;
 };

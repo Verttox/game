@@ -81,7 +81,7 @@ void CMomentumOnlineGhostEntity::FireDecal(const DecalPacket &decal)
     switch (decal.decal_type)
     {
     case DECAL_BULLET:
-        if (decal.data.bullet.iWeaponID == WEAPON_GRENADE)
+        if (decal.data.bullet.iAmmoType == AMMO_TYPE_GRENADE)
         {
             // Grenades behave differently
             ThrowGrenade(decal);
@@ -92,7 +92,7 @@ void CMomentumOnlineGhostEntity::FireDecal(const DecalPacket &decal)
                 entindex(),
                 decal.vOrigin,
                 decal.vAngle,
-                decal.data.bullet.iWeaponID,
+                decal.data.bullet.iAmmoType,
                 decal.data.bullet.iMode,
                 decal.data.bullet.iSeed,
                 decal.data.bullet.fSpread);
@@ -210,23 +210,25 @@ void CMomentumOnlineGhostEntity::FireRocket(const DecalPacket &packet)
     pRocket->SetDamage(0.0f); // Rockets do no damage unless... MOM_TODO: set this per map/gamemode flag?
 }
 
-void CMomentumOnlineGhostEntity::Precache(void)
-{
-    BaseClass::Precache();
-}
-
 void CMomentumOnlineGhostEntity::SetGhostName(const char *pGhostName)
 {
     Q_strncpy(m_szGhostName.GetForModify(), pGhostName, MAX_PLAYER_NAME_LENGTH);
 }
 
-void CMomentumOnlineGhostEntity::SetLobbyGhostAppearance(LobbyGhostAppearance_t app, bool bForceUpdate /*= false*/)
+void CMomentumOnlineGhostEntity::AppearanceFlashlightChanged(const AppearanceData_t &newApp)
 {
-    if ((!FStrEq(app.base64, "") && !FStrEq(m_CurrentAppearance.base64, app.base64)) || bForceUpdate)
+    CMomRunEntity::AppearanceFlashlightChanged(newApp);
+
+    SetGhostFlashlight(newApp.m_bFlashlightEnabled);
+}
+
+void CMomentumOnlineGhostEntity::AppearanceModelColorChanged(const AppearanceData_t &newApp)
+{
+    CMomRunEntity::AppearanceModelColorChanged(newApp);
+
+    if (mom_ghost_online_alpha_override_enable.GetBool())
     {
-        m_CurrentAppearance = app;
-        BaseClass::SetGhostAppearance(app.appearance, bForceUpdate);
-        SetGhostFlashlight(app.appearance.m_bFlashlightOn);
+        SetRenderColorA(mom_ghost_online_alpha_override.GetInt());
     }
 }
 
@@ -238,8 +240,11 @@ void CMomentumOnlineGhostEntity::Spawn()
 
 void CMomentumOnlineGhostEntity::CreateTrail()
 {
-    if (!m_ghostAppearance.m_bGhostTrailEnable || !mom_ghost_online_trail_enable.GetBool())
+    RemoveTrail();
+
+    if (!mom_ghost_online_trail_enable.GetBool())
         return;
+
     BaseClass::CreateTrail();
 }
 
@@ -392,15 +397,6 @@ void CMomentumOnlineGhostEntity::UpdatePlayerSpectate()
     if (m_pCurrentSpecPlayer && m_pCurrentSpecPlayer->GetGhostEnt() == this)
     {
         m_pCurrentSpecPlayer->TravelSpectateTargets(true);
-    }
-}
-
-void CMomentumOnlineGhostEntity::SetGhostColor(const uint32 newHexColor)
-{
-    BaseClass::SetGhostColor(newHexColor);
-    if (mom_ghost_online_alpha_override_enable.GetBool())
-    {
-        SetRenderColorA(mom_ghost_online_alpha_override.GetInt());
     }
 }
 

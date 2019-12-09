@@ -11,12 +11,7 @@
 #include "mom_modulecomms.h"
 #include "mom_timer.h"
 #include "fmtstr.h"
-
-#include "tier0/valve_minmax_off.h"
-// This is wrapped by minmax_off due to Valve making a macro for min and max...
-#include <cryptopp/base64.h>
-// Now we can unwrap
-#include "tier0/valve_minmax_on.h"
+#include "time.h"
 
 #include "tier0/memdbgon.h"
 
@@ -123,9 +118,9 @@ void CMomentumLobbySystem::ResetOtherAppearanceData()
         uint16 index = m_mapLobbyGhosts.FirstInorder();
         while (index != m_mapLobbyGhosts.InvalidIndex())
         {
-            CMomentumOnlineGhostEntity *pEntity = m_mapLobbyGhosts[index];
+            const auto pEntity = m_mapLobbyGhosts[index];
             if (pEntity)
-                pEntity->SetLobbyGhostAppearance(pEntity->GetLobbyGhostAppearance(), true);
+                pEntity->SetAppearanceData(*pEntity->GetAppearanceData(), true);
 
             index = m_mapLobbyGhosts.NextInorder(index);
         }
@@ -279,70 +274,60 @@ void CMomentumLobbySystem::HandleLobbyEnter(LobbyEnter_t* pEnter)
 
         // Set our own data
         SteamMatchmaking()->SetLobbyMemberData(m_sLobbyID, LOBBY_DATA_MAP, gpGlobals->mapname.ToCStr());
-        // Note: Our appearance is also set on spawn, so no worries if we're null here.
-        CMomentumPlayer *pPlayer = CMomentumPlayer::GetLocalPlayer();
-        if (pPlayer)
-        {
-            SetAppearanceInMemberData(pPlayer->m_playerAppearanceProps);
-        }
+
         SetGameInfoStatus();
         // Get everybody else's data
         CheckToAdd(nullptr);
     }
 }
 
-// We got a message yaay
 void CMomentumLobbySystem::HandleLobbyChatMsg(LobbyChatMsg_t* pParam)
 {
     // MOM_TODO: Keep this for if we ever end up using binary messages 
 
     char *message = new char[4096];
     int written = SteamMatchmaking()->GetLobbyChatEntry(CSteamID(pParam->m_ulSteamIDLobby), pParam->m_iChatID, nullptr, message, 4096, nullptr);
+    time_t now = time(nullptr);
+    struct tm *tm = localtime(&now);
     DevLog("SERVER: Got a chat message! Wrote %i byte(s) into buffer.\n", written);
-    Msg("SERVER: Chat message: %s\n", message);
+    Msg("SERVER: Chat message [%02d:%02d]: %s\n", tm->tm_hour, tm->tm_min, message);
     delete[] message;
 }
-void CMomentumLobbySystem::SetAppearanceInMemberData(GhostAppearance_t app)
+
+void CMomentumLobbySystem::SetAppearanceInMemberData(const AppearanceData_t &app)
 {
+    CHECK_STEAM_API(SteamMatchmaking());
+
     if (LobbyValid())
     {
-        CHECK_STEAM_API(SteamMatchmaking());
-        std::string base64Appearance;
+        KeyValuesAD pAppearanceKV("app");
+        app.ToKV(pAppearanceKV);
 
-        CryptoPP::StringSource ss(reinterpret_cast<unsigned char *>(&app), 
-                                  sizeof(GhostAppearance_t), 
-                                  true,
-                                  new CryptoPP::Base64Encoder(new CryptoPP::StringSink(base64Appearance))
-        );
+        CUtlBuffer buf;
+        buf.SetBufferType(true, false);
 
-        SteamMatchmaking()->SetLobbyMemberData(m_sLobbyID, LOBBY_DATA_APPEARANCE, base64Appearance.c_str());
+        pAppearanceKV->RecursiveSaveToFile(buf, 0);
+
+        SteamMatchmaking()->SetLobbyMemberData(m_sLobbyID, LOBBY_DATA_APPEARANCE, buf.String());
     }
 }
-bool CMomentumLobbySystem::GetAppearanceFromMemberData(const CSteamID &member, LobbyGhostAppearance_t &out)
+
+bool CMomentumLobbySystem::GetAppearanceFromMemberData(const CSteamID &member, AppearanceData_t &out)
 {
-    bool toReturn = false;
+    CHECK_STEAM_API_B(SteamMatchmaking());
+
     const char *pAppearance = SteamMatchmaking()->GetLobbyMemberData(m_sLobbyID, member, LOBBY_DATA_APPEARANCE);
-    if (!FStrEq(pAppearance, ""))
+    if (pAppearance && !FStrEq(pAppearance, ""))
     {
-        Q_strncpy(out.base64, pAppearance, sizeof(out.base64));
+        KeyValuesAD pAppearanceKV("app");
+        pAppearanceKV->LoadFromBuffer(nullptr, pAppearance);
 
-        std::string encoded(pAppearance);
+        out.FromKV(pAppearanceKV);
 
-        CryptoPP::Base64Decoder decoder;
-        decoder.Put((byte*)encoded.data(), encoded.size());
-        decoder.MessageEnd();
-
-        GhostAppearance_t newAppearance;
-
-        const auto size = decoder.MaxRetrievable();
-        if (size && size == sizeof(GhostAppearance_t))
-        {
-            decoder.Get((byte*)&newAppearance, sizeof(GhostAppearance_t));
-            out.appearance = newAppearance;
-            toReturn = true;
-        }
+        return true;
     }
-    return toReturn;
+
+    return false;
 }
 
 CMomentumOnlineGhostEntity* CMomentumLobbySystem::GetLobbyMemberEntity(const uint64 &id)
@@ -467,9 +452,9 @@ void CMomentumLobbySystem::HandleLobbyDataUpdate(LobbyDataUpdate_t* pParam)
             CMomentumOnlineGhostEntity *pEntity = GetLobbyMemberEntity(memberChanged);
             if (pEntity)
             {
-                LobbyGhostAppearance_t appear;
+                AppearanceData_t appear;
                 if (GetAppearanceFromMemberData(memberChanged, appear))
-                    pEntity->SetLobbyGhostAppearance(appear);
+                    pEntity->SetAppearanceData(appear, false);
             }
 
             CheckToAdd(&memberChanged);
@@ -595,9 +580,9 @@ void CMomentumLobbySystem::CheckToAdd(CSteamID *pID)
                 newPlayer->SetGhostSteamID(*pID);
                 newPlayer->SetGhostName(pName);
                 newPlayer->Spawn();
-                LobbyGhostAppearance_t appear;
+                AppearanceData_t appear;
                 if (GetAppearanceFromMemberData(*pID, appear))
-                    newPlayer->SetLobbyGhostAppearance(appear, true); // Appearance after spawn!
+                    newPlayer->SetAppearanceData(appear, true); // Appearance after spawn!
 
                 bool isSpectating = GetIsSpectatingFromMemberData(*pID);
 

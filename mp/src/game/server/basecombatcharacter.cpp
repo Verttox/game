@@ -2967,10 +2967,10 @@ int CBaseCombatCharacter::GiveAmmo( int iCount, int iAmmoIndex, bool bSuppressSo
 		return 0;
 	}
 
-	if ( iAmmoIndex < 0 || iAmmoIndex >= MAX_AMMO_SLOTS )
+	if ( iAmmoIndex < 0 || iAmmoIndex >= AMMO_TYPE_MAX )
 		return 0;
 
-	int iMax = GetAmmoDef()->MaxCarry(iAmmoIndex);
+	int iMax = g_pAmmoDef->MaxCarry(iAmmoIndex);
 	int iAdd = MIN( iCount, iMax - m_iAmmo[iAmmoIndex] );
 	if ( iAdd < 1 )
 		return 0;
@@ -2984,20 +2984,6 @@ int CBaseCombatCharacter::GiveAmmo( int iCount, int iAmmoIndex, bool bSuppressSo
 	m_iAmmo.Set( iAmmoIndex, m_iAmmo[iAmmoIndex] + iAdd );
 
 	return iAdd;
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Give the player some ammo.
-//-----------------------------------------------------------------------------
-int CBaseCombatCharacter::GiveAmmo( int iCount, const char *szName, bool bSuppressSound )
-{
-	int iAmmoType = GetAmmoDef()->Index(szName);
-	if (iAmmoType == -1)
-	{
-		Msg("ERROR: Attempting to give unknown ammo type (%s)\n",szName);
-		return 0;
-	}
-	return GiveAmmo( iCount, iAmmoType, bSuppressSound );
 }
 
 

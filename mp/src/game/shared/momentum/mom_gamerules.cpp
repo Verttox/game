@@ -3,7 +3,6 @@
 #include "mathlib/mathlib.h"
 #include "mom_shareddefs.h"
 #include "voice_gamemgr.h"
-#include "weapon/cs_ammodef.h"
 #include "weapon/weapon_base_gun.h"
 #include "filesystem.h"
 #include "movevars_shared.h"
@@ -17,75 +16,6 @@
 #include "tier0/memdbgon.h"
 
 REGISTER_GAMERULES_CLASS(CMomentumGameRules);
-
-// shared ammo definition
-// JAY: Trying to make a more physical bullet response
-#define BULLET_MASS_GRAINS_TO_LB(grains) (0.002285 * (grains) / 16.0f)
-#define BULLET_MASS_GRAINS_TO_KG(grains) lbs2kg(BULLET_MASS_GRAINS_TO_LB(grains))
-
-// exaggerate all of the forces, but use real numbers to keep them consistent
-#define BULLET_IMPULSE_EXAGGERATION 1
-
-// convert a velocity in ft/sec and a mass in grains to an impulse in kg in/s
-#define BULLET_IMPULSE(grains, ftpersec)                                                                               \
-    ((ftpersec)*12 * BULLET_MASS_GRAINS_TO_KG(grains) * BULLET_IMPULSE_EXAGGERATION)
-
-static CAmmoDef ammoDef;
-
-CAmmoDef *GetAmmoDef()
-{
-    static bool bInitted = false;
-
-    if (!bInitted)
-    {
-        bInitted = true;
-
-        ammoDef.AddAmmoType(BULLET_PLAYER_50AE, DMG_BULLET, TRACER_LINE, 0, 0, "ammo_50AE_max",
-                            2400 * BULLET_IMPULSE_EXAGGERATION, 0, 10, 14);
-        ammoDef.AddAmmoType(BULLET_PLAYER_762MM, DMG_BULLET, TRACER_LINE, 0, 0, "ammo_762mm_max",
-                            2400 * BULLET_IMPULSE_EXAGGERATION, 0, 10, 14);
-        ammoDef.AddAmmoType(BULLET_PLAYER_556MM, DMG_BULLET, TRACER_LINE, 0, 0, "ammo_556mm_max",
-                            2400 * BULLET_IMPULSE_EXAGGERATION, 0, 10, 14);
-        ammoDef.AddAmmoType(BULLET_PLAYER_556MM_BOX, DMG_BULLET, TRACER_LINE, 0, 0, "ammo_556mm_box_max",
-                            2400 * BULLET_IMPULSE_EXAGGERATION, 0, 10, 14);
-        ammoDef.AddAmmoType(BULLET_PLAYER_338MAG, DMG_BULLET, TRACER_LINE, 0, 0, "ammo_338mag_max",
-                            2800 * BULLET_IMPULSE_EXAGGERATION, 0, 12, 16);
-        ammoDef.AddAmmoType(BULLET_PLAYER_9MM, DMG_BULLET, TRACER_LINE, 0, 0, "ammo_9mm_max",
-                            2000 * BULLET_IMPULSE_EXAGGERATION, 0, 5, 10);
-        ammoDef.AddAmmoType(BULLET_PLAYER_BUCKSHOT, DMG_BULLET, TRACER_LINE, 0, 0, "ammo_buckshot_max",
-                            600 * BULLET_IMPULSE_EXAGGERATION, 0, 3, 6);
-        ammoDef.AddAmmoType(BULLET_PLAYER_45ACP, DMG_BULLET, TRACER_LINE, 0, 0, "ammo_45acp_max",
-                            2100 * BULLET_IMPULSE_EXAGGERATION, 0, 6, 10);
-        ammoDef.AddAmmoType(BULLET_PLAYER_357SIG, DMG_BULLET, TRACER_LINE, 0, 0, "ammo_357sig_max",
-                            2000 * BULLET_IMPULSE_EXAGGERATION, 0, 4, 8);
-        ammoDef.AddAmmoType(BULLET_PLAYER_57MM, DMG_BULLET, TRACER_LINE, 0, 0, "ammo_57mm_max",
-                            2000 * BULLET_IMPULSE_EXAGGERATION, 0, 4, 8);
-        ammoDef.AddAmmoType(AMMO_TYPE_HEGRENADE, DMG_BLAST, TRACER_LINE, 0, 0, 1 /*max carry*/, 1, 0);
-        ammoDef.AddAmmoType(AMMO_TYPE_FLASHBANG, 0, TRACER_LINE, 0, 0, 2 /*max carry*/, 1, 0);
-        ammoDef.AddAmmoType(AMMO_TYPE_SMOKEGRENADE, 0, TRACER_LINE, 0, 0, 1 /*max carry*/, 1, 0);
-        ammoDef.AddAmmoType(AMMO_TYPE_PAINT, DMG_BULLET, TRACER_LINE, 0, 0, "ammo_paint_max",
-                            3000 * BULLET_IMPULSE_EXAGGERATION, 0);
-        ammoDef.AddAmmoType(AMMO_TYPE_ROCKET, DMG_BLAST, TRACER_LINE, 0, 0, "ammo_rocket_max", 1, 0, 146, 146);
-    }
-
-    return &ammoDef;
-}
-
-ConVar ammo_50AE_max("ammo_50AE_max", "-2", FCVAR_REPLICATED);
-ConVar ammo_762mm_max("ammo_762mm_max", "-2", FCVAR_REPLICATED);
-ConVar ammo_556mm_max("ammo_556mm_max", "-2", FCVAR_REPLICATED);
-ConVar ammo_556mm_box_max("ammo_556mm_box_max", "-2", FCVAR_REPLICATED);
-ConVar ammo_338mag_max("ammo_338mag_max", "-2", FCVAR_REPLICATED);
-ConVar ammo_9mm_max("ammo_9mm_max", "-2", FCVAR_REPLICATED);
-ConVar ammo_buckshot_max("ammo_buckshot_max", "-2", FCVAR_REPLICATED);
-ConVar ammo_45acp_max("ammo_45acp_max", "-2", FCVAR_REPLICATED);
-ConVar ammo_357sig_max("ammo_357sig_max", "-2", FCVAR_REPLICATED);
-ConVar ammo_57mm_max("ammo_57mm_max", "-2", FCVAR_REPLICATED);
-ConVar ammo_hegrenade_max("ammo_hegrenade_max", "1", FCVAR_REPLICATED);
-ConVar ammo_flashbang_max("ammo_flashbang_max", "2", FCVAR_REPLICATED);
-ConVar ammo_smokegrenade_max("ammo_smokegrenade_max", "1", FCVAR_REPLICATED);
-ConVar ammo_paint_max("ammo_paint_max", "-2", FCVAR_REPLICATED);
-ConVar ammo_rocket_max("ammo_rocket_max", "-2", FCVAR_REPLICATED);
 
 CMomentumGameRules::CMomentumGameRules()
 {
@@ -312,8 +242,9 @@ void CMomentumGameRules::PlayerSpawn(CBasePlayer *pPlayer)
 
 bool CMomentumGameRules::AllowDamage(CBaseEntity *pVictim, const CTakeDamageInfo &info) 
 {
-    // Allow self damage from rockets
-    if (pVictim == info.GetAttacker() && FClassnameIs(info.GetInflictor(), "momentum_rocket"))
+    // Allow self damage from rockets and generic bombs
+    if (pVictim == info.GetAttacker() && (FClassnameIs(info.GetInflictor(), "momentum_rocket") 
+                                       || FClassnameIs(info.GetInflictor(), "momentum_generic_bomb")))
         return true;
 
     return !pVictim->IsPlayer(); 
@@ -357,7 +288,10 @@ void CMomentumGameRules::RadiusDamage(const CTakeDamageInfo &info, const Vector 
 
     if (pAttacker && g_pGameModeSystem->GameModeIs(GAMEMODE_RJ))
     {
-        flRadius = 121.0f; // Rocket self-damage radius is 121.0f
+        if (FClassnameIs(pAttacker, "momentum_rocket"))
+        {
+            flRadius = 121.0f; // Rocket self-damage radius is 121.0f
+        }
 
         Vector nearestPoint;
         pAttacker->CollisionProp()->CalcNearestPoint(vecSrc, &nearestPoint);
@@ -439,6 +373,16 @@ void CMomentumGameRules::ApplyRadiusDamage(CBaseEntity *pEntity, const CTakeDama
     else
     {
         pEntity->TakeDamage(adjustedInfo);
+        if (pEntity->IsPlayer())
+        {
+            CMomentumPlayer *pPlayer = static_cast<CMomentumPlayer*>(pEntity);
+            CSingleUserRecipientFilter user(pPlayer);
+            user.MakeReliable();
+            UserMessageBegin(user, "DamageIndicator");
+            WRITE_BYTE((int)adjustedInfo.GetDamage());
+            WRITE_VEC3COORD(vecSrc);
+            MessageEnd();
+        }
     }
 
     // Now hit all triggers along the way that respond to damage...

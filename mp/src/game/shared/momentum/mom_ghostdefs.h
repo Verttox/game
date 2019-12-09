@@ -22,9 +22,58 @@ enum PacketType
     PT_COUNT
 };
 
-#define DEFAULT_PORT 9000
-#define DEFAULT_STEAM_PORT 9001
-#define DEFAULT_MASTER_SERVER_PORT 9002
+#define APPEARANCE_BODYGROUP_MIN 0
+#define APPEARANCE_BODYGROUP_MAX 14
+#define APPEARANCE_TRAIL_LEN_MIN 1
+#define APPEARANCE_TRAIL_LEN_MAX 10
+
+struct AppearanceData_t
+{
+    int m_iBodyGroup;
+    uint32 m_iModelRGBAColorAsHex;
+    uint32 m_iTrailRGBAColorAsHex;
+    uint8 m_iTrailLength;
+    bool m_bTrailEnabled;
+    bool m_bFlashlightEnabled;
+
+    AppearanceData_t()
+    {
+        m_iBodyGroup = 11;
+        m_iModelRGBAColorAsHex = 0x0000FFFF;
+        m_iTrailRGBAColorAsHex = 0xFFFFFFFF;
+        m_iTrailLength = APPEARANCE_TRAIL_LEN_MIN;
+        m_bTrailEnabled = false;
+        m_bFlashlightEnabled = false;
+    }
+
+    void ValidateValues()
+    {
+        m_iBodyGroup = clamp<int>(m_iBodyGroup, APPEARANCE_BODYGROUP_MIN, APPEARANCE_BODYGROUP_MAX);
+        m_iTrailLength = clamp<uint8>(m_iTrailLength, APPEARANCE_TRAIL_LEN_MIN, APPEARANCE_TRAIL_LEN_MAX);
+    }
+
+    void FromKV(KeyValues *pKV)
+    {
+        m_iBodyGroup = pKV->GetInt("bodygroup");
+        m_iModelRGBAColorAsHex = (uint32)pKV->GetInt("model_color");
+        m_iTrailRGBAColorAsHex = (uint32)pKV->GetInt("trail_color");
+        m_iTrailLength = pKV->GetInt("trail_length");
+        m_bTrailEnabled = pKV->GetBool("trail_enabled");
+        m_bFlashlightEnabled = pKV->GetBool("flashlight_enabled");
+
+        ValidateValues();
+    }
+
+    void ToKV(KeyValues *pKV) const
+    {
+        pKV->SetInt("bodygroup", m_iBodyGroup);
+        pKV->SetInt("model_color", m_iModelRGBAColorAsHex);
+        pKV->SetInt("trail_color", m_iTrailRGBAColorAsHex);
+        pKV->SetInt("trail_length", m_iTrailLength);
+        pKV->SetBool("trail_enabled", m_bTrailEnabled);
+        pKV->SetBool("flashlight_enabled", m_bFlashlightEnabled);
+    }
+};
 
 class MomentumPacket
 {
@@ -35,70 +84,6 @@ class MomentumPacket
     virtual void Write(CUtlBuffer &buf) { buf.PutUnsignedChar(GetType()); }
 };
 
-//Describes all data for visual apperence of players ingame
-struct GhostAppearance_t
-{
-    int m_iGhostModelBodygroup;
-    uint32 m_iGhostModelRGBAColorAsHex;
-    uint32 m_iGhostTrailRGBAColorAsHex;
-    uint8 m_iGhostTrailLength;
-    bool m_bGhostTrailEnable;
-    bool m_bFlashlightOn;
-
-    GhostAppearance_t(const int bodyGroup, const uint32 bodyRGBA, const uint32 trailRGBA, const uint8 trailLen, const bool hasTrail, const bool flashlightOn)
-    {
-        m_iGhostModelBodygroup = bodyGroup;
-        m_iGhostModelRGBAColorAsHex = bodyRGBA;
-        m_iGhostTrailRGBAColorAsHex = trailRGBA;
-        m_iGhostTrailLength = trailLen;
-        m_bGhostTrailEnable = hasTrail;
-        m_bFlashlightOn = flashlightOn;
-    }
-    GhostAppearance_t(): m_iGhostModelBodygroup(0), m_iGhostModelRGBAColorAsHex(0), m_iGhostTrailRGBAColorAsHex(0), m_iGhostTrailLength(0), m_bGhostTrailEnable(false), m_bFlashlightOn(false)
-    {
-    }
-
-    GhostAppearance_t &operator=(const GhostAppearance_t &other) 
-    {
-        m_iGhostModelBodygroup = other.m_iGhostModelBodygroup;
-        m_iGhostModelRGBAColorAsHex = other.m_iGhostModelRGBAColorAsHex;
-        m_iGhostTrailRGBAColorAsHex = other.m_iGhostTrailRGBAColorAsHex;
-        m_iGhostTrailLength = other.m_iGhostTrailLength;
-        m_bGhostTrailEnable = other.m_bGhostTrailEnable;
-        m_bFlashlightOn = other.m_bFlashlightOn;
-        return *this;
-    }
-    bool operator==(const GhostAppearance_t &other) const
-    {
-        return m_iGhostModelBodygroup == other.m_iGhostModelBodygroup &&
-            m_iGhostModelRGBAColorAsHex == other.m_iGhostModelRGBAColorAsHex &&
-            m_iGhostTrailRGBAColorAsHex == other.m_iGhostTrailRGBAColorAsHex &&
-            m_iGhostTrailLength == other.m_iGhostTrailLength &&
-            m_bGhostTrailEnable == other.m_bGhostTrailEnable &&
-            m_bFlashlightOn == other.m_bFlashlightOn;
-    }
-};
-
-struct LobbyGhostAppearance_t
-{
-    GhostAppearance_t appearance;
-    char base64[1024]; // Used as a quick verify
-
-    LobbyGhostAppearance_t()
-    {
-        base64[0] = '\0';
-        appearance = GhostAppearance_t();
-    }
-
-    LobbyGhostAppearance_t &operator=(const LobbyGhostAppearance_t &other) 
-    {
-        appearance = other.appearance;
-        Q_strncpy(base64, other.base64, sizeof(base64));
-        return *this;
-    }
-};
-
-
 // Based on CReplayFrame, describes data needed for ghost's physical properties 
 class PositionPacket : public MomentumPacket
 {
@@ -108,8 +93,7 @@ class PositionPacket : public MomentumPacket
     QAngle EyeAngle;
     Vector Position;
     Vector Velocity;
-    PositionPacket(const QAngle eyeAngle, const Vector position, const Vector velocity, 
-        const float viewOffsetZ, const int buttons)
+    PositionPacket(const QAngle eyeAngle, const Vector position, const Vector velocity, const float viewOffsetZ, const int buttons)
     {
         EyeAngle = eyeAngle;
         Position = position;
@@ -179,8 +163,6 @@ struct ReceivedFrame_t
     }
 };
 
-
-
 class SpecUpdatePacket : public MomentumPacket
 {
   public:
@@ -220,7 +202,7 @@ enum DecalType
 
 struct BulletDecalData
 {
-    int iWeaponID;
+    int iAmmoType;
     int iMode;
     int iSeed;
     float fSpread;
@@ -264,10 +246,10 @@ class DecalPacket : public MomentumPacket
 
     DecalPacket() {}
 
-    static DecalPacket Bullet(Vector origin, QAngle angle, int iWeaponID, int iMode, int iSeed, float fSpread)
+    static DecalPacket Bullet(Vector origin, QAngle angle, int iAmmoType, int iMode, int iSeed, float fSpread)
     {
         DecalPacket packet(DECAL_BULLET, origin, angle);
-        packet.data.bullet.iWeaponID = iWeaponID;
+        packet.data.bullet.iAmmoType = iAmmoType;
         packet.data.bullet.iMode = iMode;
         packet.data.bullet.iSeed = iSeed;
         packet.data.bullet.fSpread = fSpread;

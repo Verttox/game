@@ -57,7 +57,7 @@
         "MOM_MapRank" "Map Rank: %mRank%"
         "MOM_Level" "Level %level%"
         "MOM_GlobalRank" "Global Rank: %gRank% / %gTotal%"
-        "MOM_PersonalBestTime" "Personal Best Time: %time%"
+        "MOM_PersonalBestTime" "Personal Best: %time%"
         "MOM_RankXP" "Rank XP: %rankXP%"
         "MOM_CosXP" "Cosmetic XP: %cosXP%"
         "MOM_MapsCompleted" "Maps Completed: %mapsCompleted%"
@@ -96,7 +96,7 @@
         "MOM_Ruler_FirstPoint" "First point"
         "MOM_Ruler_SecondPoint" "Second point"
         "MOM_Ruler_Measure" "Measure distance"
-        "MOM_Ruler_Distance" "The distance between the points is %.4f units.\n"
+        "MOM_Ruler_Distance" "Distance: %s1 units\n"
         "MOM_Ruler_ToggleMenu" "Toggle showing Ruler Menu"
 
     //Comparison Panel
@@ -273,8 +273,8 @@
         "MOM_Settings_Speedometer_Show_Hvel" "Display only horizontal velocity (No Z component)."
         "MOM_Settings_Speedometer_Color_Type_Label" "Speedometer Color Mode:"
         "MOM_Settings_Speedometer_Color_Type_None" "No color"
-        "MOM_Settings_Speedometer_Color_Type_1" "Colorize based on acceleration"
-        "MOM_Settings_Speedometer_Color_Type_2" "Colorize based on velocity compared to max"
+        "MOM_Settings_Speedometer_Color_Type_1" "Based on acceleration"
+        "MOM_Settings_Speedometer_Color_Type_2" "Based on velocity compared to max"
         "MOM_Settings_Speedometer_Units_Label" "Speedometer Units:"
         "MOM_Settings_Speedometer_Units_UPS" "Units per second"
         "MOM_Settings_Speedometer_Units_KPH" "Kilometers per hour"
@@ -372,7 +372,6 @@
         // Spec GUI
         "MOM_WatchingReplay"    "REPLAY"
         "MOM_WatchingGhost"    "SPECTATING"
-        "MOM_ReplayPlayer"      "Player: %s1"
         "MOM_SpecGUI_GainControl" "Press your %duck% key to toggle mouse capture!"
         "MOM_SpecGUI_StopPlayback" "Stop Playback"
         "MOM_SpecGUI_StopSpectating" "Stop Spectating"
@@ -397,7 +396,7 @@
         "MOM_NotApplicable" "N/A"
 
         // WEB/API/SERVER RESPONSES
-        "MOM_API_WaitingForResponse" "Waiting for API response..."
+        "MOM_API_WaitingForResponse" "Fetching data..."
         "MOM_API_Unavailable" "API is currently unavailable"
         "MOM_API_ServerError" "Server Error"
         "MOM_API_NoTimesReturned" "No runs found"

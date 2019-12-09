@@ -14,77 +14,8 @@
 
 #include "tier0/memdbgon.h"
 
-ConVar
-    sv_showimpacts("sv_showimpacts", "0", FCVAR_REPLICATED,
+ConVar sv_showimpacts("sv_showimpacts", "0", FCVAR_REPLICATED,
                    "Shows client (red) and server (blue) bullet impact point (1=both, 2=client-only, 3=server-only)");
-
-void CMomentumPlayer::GetBulletTypeParameters(int iBulletType, float &fPenetrationPower, float &flPenetrationDistance,
-                                              bool &bPaint)
-{
-    if (IsAmmoType(iBulletType, BULLET_PLAYER_50AE))
-    {
-        fPenetrationPower = 30.0f;
-        flPenetrationDistance = 1000.0f;
-    }
-    else if (IsAmmoType(iBulletType, BULLET_PLAYER_762MM))
-    {
-        fPenetrationPower = 39.0f;
-        flPenetrationDistance = 5000.0f;
-    }
-    else if (IsAmmoType(iBulletType, BULLET_PLAYER_556MM) || IsAmmoType(iBulletType, BULLET_PLAYER_556MM_BOX))
-    {
-        fPenetrationPower = 35.0f;
-        flPenetrationDistance = 4000.0f;
-    }
-    else if (IsAmmoType(iBulletType, BULLET_PLAYER_338MAG))
-    {
-        fPenetrationPower = 45.0f;
-        flPenetrationDistance = 8000.0f;
-    }
-    else if (IsAmmoType(iBulletType, BULLET_PLAYER_9MM))
-    {
-        fPenetrationPower = 21.0f;
-        flPenetrationDistance = 800.0f;
-    }
-    else if (IsAmmoType(iBulletType, BULLET_PLAYER_BUCKSHOT))
-    {
-        fPenetrationPower = 0.0f;
-        flPenetrationDistance = 0.0f;
-    }
-    else if (IsAmmoType(iBulletType, BULLET_PLAYER_45ACP))
-    {
-        fPenetrationPower = 15.0f;
-        flPenetrationDistance = 500.0f;
-    }
-    else if (IsAmmoType(iBulletType, BULLET_PLAYER_357SIG))
-    {
-        fPenetrationPower = 25.0f;
-        flPenetrationDistance = 800.0f;
-    }
-    else if (IsAmmoType(iBulletType, BULLET_PLAYER_57MM))
-    {
-        fPenetrationPower = 30.0f;
-        flPenetrationDistance = 2000.0f;
-    }
-    else if (IsAmmoType(iBulletType, AMMO_TYPE_PAINT))
-    {
-        fPenetrationPower = .0f;
-        flPenetrationDistance = 0.0f;
-        bPaint = true;
-    }
-    else if (IsAmmoType(iBulletType, AMMO_TYPE_ROCKET))
-    {
-        fPenetrationPower = .0f;
-        flPenetrationDistance = 0.0f;
-    }
-    else
-    {
-        // What kind of ammo is this?
-        Assert(false);
-        fPenetrationPower = 0;
-        flPenetrationDistance = 0.0;
-    }
-}
 
 static bool TraceToExit(Vector &start, Vector &dir, Vector &end, float flStepSize, float flMaxDistance)
 {
@@ -124,28 +55,24 @@ inline void UTIL_TraceLineIgnoreTwoEntities(const Vector &vecAbsStart, const Vec
 void CMomentumPlayer::FireBullet(Vector vecSrc,             // shooting postion
                                  const QAngle &shootAngles, // shooting angle
                                  float vecSpread,           // spread vector
-                                 float flDistance,          // max distance
-                                 int iPenetration,          // how many obstacles can be penetrated
                                  int iBulletType,           // ammo type
-                                 int iDamage,               // base damage
-                                 float flRangeModifier,     // damage range modifier
                                  CBaseEntity *pevAttacker,  // shooter
                                  bool bDoEffects,           // Is this the client DLL?
                                  float x, float y)
 {
-    float fCurrentDamage = iDamage; // damage of the bullet at its current trajectory
+    float fCurrentDamage = g_pAmmoDef->DamageAmount(iBulletType); // damage of the bullet at its current trajectory
     float flCurrentDistance = 0.0f;  // distance that the bullet has traveled so far
 
     Vector vecDirShooting, vecRight, vecUp;
     AngleVectors(shootAngles, &vecDirShooting, &vecRight, &vecUp);
 
-    float flPenetrationPower = 0.0f;    // thickness of a wall that this bullet can penetrate
-    float flPenetrationDistance = 0.0f; // distance at which the bullet is capable of penetrating a wall
+    int iPenetration = g_pAmmoDef->PenetrationAmount(iBulletType);
+    float flPenetrationPower = g_pAmmoDef->PenetrationPower(iBulletType);    // thickness of a wall that this bullet can penetrate
+    float flPenetrationDistance = g_pAmmoDef->PenetrationDistance(iBulletType); // distance at which the bullet is capable of penetrating a wall
     float flDamageModifier = 0.5f;    // default modification of bullets power after they go through a wall.
     float flPenetrationModifier = 1.f;
-    bool bPaintGun = false;
-
-    GetBulletTypeParameters(iBulletType, flPenetrationPower, flPenetrationDistance, bPaintGun);
+    bool bPaintGun = iBulletType == AMMO_TYPE_PAINT;
+    float flDistance = g_pAmmoDef->Range(iBulletType);
 
     if (!pevAttacker)
         pevAttacker = this; // the default attacker is ourselves
@@ -230,7 +157,7 @@ void CMomentumPlayer::FireBullet(Vector vecSrc,             // shooting postion
 
         // calculate the damage based on the distance the bullet travelled.
         flCurrentDistance += tr.fraction * flDistance;
-        fCurrentDamage *= pow(flRangeModifier, (flCurrentDistance / 500));
+        fCurrentDamage *= pow(g_pAmmoDef->RangeModifier(iBulletType), (flCurrentDistance / 500));
 
         // check if we reach penetration distance, no more penetrations after that
         if (flCurrentDistance > flPenetrationDistance && iPenetration > 0)
@@ -274,15 +201,22 @@ void CMomentumPlayer::FireBullet(Vector vecSrc,             // shooting postion
         // add damage to entity that we hit
 
 #ifndef CLIENT_DLL
-        ClearMultiDamage();
+        if (pevAttacker->IsPlayer())
+        {
+            CMomentumPlayer *pPlayerAttacker = static_cast<CMomentumPlayer*>(pevAttacker);
+            if (!pPlayerAttacker->m_bHasPracticeMode)
+            {
+                ClearMultiDamage();
 
-        CTakeDamageInfo info(pevAttacker, pevAttacker, fCurrentDamage, iDamageType);
-        CalculateBulletDamageForce(&info, iBulletType, vecDir, tr.endpos);
-        tr.m_pEnt->DispatchTraceAttack(info, vecDir, &tr);
+                CTakeDamageInfo info(pevAttacker, pevAttacker, fCurrentDamage, iDamageType);
+                CalculateBulletDamageForce(&info, iBulletType, vecDir, tr.endpos);
+                tr.m_pEnt->DispatchTraceAttack(info, vecDir, &tr);
 
-        TraceAttackToTriggers(info, tr.startpos, tr.endpos, vecDir);
+                TraceAttackToTriggers(info, tr.startpos, tr.endpos, vecDir);
 
-        ApplyMultiDamage();
+                ApplyMultiDamage();
+            }
+        }
 #endif
 
         // check if bullet can penetarte another entity

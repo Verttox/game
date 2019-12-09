@@ -18,6 +18,23 @@
 
 #include "tier0/memdbgon.h"
 
+#define NO_REFL_NORMAL_CHANGE -2.0f // not used
+#define BHOP_DELAY_TIME 15 // Time to delay successive bhops by, in ticks
+#define STOP_EPSILON 0.1
+#define MAX_CLIP_PLANES 5
+
+#define STAMINA_MAX 100.0f
+#define STAMINA_COST_JUMP 25.0f
+#define STAMINA_COST_FALL 20.0f // not used
+#define STAMINA_RECOVER_RATE 19.0f
+#define CS_WALK_SPEED 135.0f
+
+#define DUCK_SPEED_MULTIPLIER 0.34f
+
+#define GROUND_FACTOR_MULTIPLIER 301.99337741082998788946739227784f // not used
+
+#define NON_JUMP_VELOCITY ( g_pGameModeSystem->GameModeIs(GAMEMODE_RJ) ? 250.0f : 140.0f )
+
 // remove this eventually
 ConVar sv_slope_fix("sv_slope_fix", "1");
 ConVar sv_ramp_fix("sv_ramp_fix", "1");
@@ -566,9 +583,7 @@ bool CMomentumGameMovement::CanUnduck()
         Vector hullSizeNormal = VEC_HULL_MAX - VEC_HULL_MIN;
         Vector hullSizeCrouch = VEC_DUCK_HULL_MAX - VEC_DUCK_HULL_MIN;
 
-        float viewScale = g_pGameModeSystem->GameModeIs(GAMEMODE_RJ) ? 1.0f : 0.5f;
-
-        newOrigin += -viewScale * (hullSizeNormal - hullSizeCrouch);
+        newOrigin += -VIEW_SCALE * (hullSizeNormal - hullSizeCrouch);
     }
 
     UTIL_TraceHull(mv->GetAbsOrigin(), newOrigin, VEC_HULL_MIN, VEC_HULL_MAX, PlayerSolidMask(), player,
@@ -724,7 +739,7 @@ void CMomentumGameMovement::Duck(void)
             VectorCopy(mv->GetAbsOrigin(), newOrigin);
             Vector hullSizeNormal = VEC_HULL_MAX - VEC_HULL_MIN;
             Vector hullSizeCrouch = VEC_DUCK_HULL_MAX - VEC_DUCK_HULL_MIN;
-            newOrigin -= (hullSizeNormal - hullSizeCrouch);
+            newOrigin -= VIEW_SCALE * (hullSizeNormal - hullSizeCrouch);
             groundCheck = newOrigin;
             groundCheck.z -= player->GetStepSize();
 
@@ -747,15 +762,24 @@ void CMomentumGameMovement::Duck(void)
     if ((mv->m_nButtons & IN_DUCK) || (player->m_Local.m_bDucking) || (player->GetFlags() & FL_DUCKING))
     {
         if (mv->m_nButtons & IN_DUCK)
-        {
-
-            bool alreadyDucked = (player->GetFlags() & FL_DUCKING) ? true : false;
-
-            if ((buttonsPressed & IN_DUCK) && !(player->GetFlags() & FL_DUCKING))
+        {        
+            if (buttonsPressed & IN_DUCK)
             {
-                // Use 1 second so super long jump will work
-                player->m_Local.m_flDucktime = GAMEMOVEMENT_DUCK_TIME;
-                player->m_Local.m_bDucking = true;
+                if (!(player->GetFlags() & FL_DUCKING))
+                {
+                    // Use 1 second so super long jump will work
+                    player->m_Local.m_flDucktime = GAMEMOVEMENT_DUCK_TIME;
+                    player->m_Local.m_bDucking = true;
+                }
+                else if (player->m_Local.m_bDucking)
+                {
+                    // Invert time if released before fully unducked
+                    float remainingDuckMilliseconds =
+                        (GAMEMOVEMENT_DUCK_TIME - player->m_Local.m_flDucktime) * (TIME_TO_DUCK / TIME_TO_UNDUCK);
+
+                    player->m_Local.m_flDucktime =
+                        GAMEMOVEMENT_DUCK_TIME - TIME_TO_DUCK_MS + remainingDuckMilliseconds;
+                }
             }
 
             float duckmilliseconds = max(0.0f, GAMEMOVEMENT_DUCK_TIME - (float)player->m_Local.m_flDucktime);
@@ -766,8 +790,7 @@ void CMomentumGameMovement::Duck(void)
             if (player->m_Local.m_bDucking)
             {
                 // Finish ducking immediately if duck time is over or not on ground
-                if ((duckseconds > TIME_TO_DUCK) || (!bIsSliding && player->GetGroundEntity() == nullptr) ||
-                    alreadyDucked)
+                if ((duckseconds > TIME_TO_DUCK) || (!bIsSliding && player->GetGroundEntity() == nullptr))
                 {
                     FinishDuck();
                 }
@@ -797,10 +820,10 @@ void CMomentumGameMovement::Duck(void)
                     {
                         // Invert time if released before fully ducked
                         float remainingUnduckMilliseconds =
-                            (GAMEMOVEMENT_DUCK_TIME - player->m_Local.m_flDucktime) * (TIME_TO_DUCK / TIME_TO_UNDUCK);
+                            (GAMEMOVEMENT_DUCK_TIME - player->m_Local.m_flDucktime) * (TIME_TO_UNDUCK / TIME_TO_DUCK);
 
                         player->m_Local.m_flDucktime =
-                            GAMEMOVEMENT_DUCK_TIME - TIME_TO_DUCK_MS + remainingUnduckMilliseconds;
+                            GAMEMOVEMENT_DUCK_TIME - TIME_TO_UNDUCK_MS + remainingUnduckMilliseconds;
                     }
                 }
 
@@ -836,9 +859,7 @@ void CMomentumGameMovement::Duck(void)
                         // FL_DUCKING flag is the important bit here,
                         // as it will allow for ctaps.
                         SetDuckedEyeOffset(1.0f);
-                        player->m_Local.m_flDucktime = GAMEMOVEMENT_DUCK_TIME;
                         player->m_Local.m_bDucked = true;
-                        player->m_Local.m_bDucking = false;
                         player->AddFlag(FL_DUCKING);
                     }
                 }
@@ -868,9 +889,7 @@ void CMomentumGameMovement::FinishUnDuck(void)
         Vector hullSizeNormal = VEC_HULL_MAX - VEC_HULL_MIN;
         Vector hullSizeCrouch = VEC_DUCK_HULL_MAX - VEC_DUCK_HULL_MIN;
 
-        float viewScale = g_pGameModeSystem->GameModeIs(GAMEMODE_RJ) ? 1.0f : 0.5f;
-
-        Vector viewDelta = -viewScale * (hullSizeNormal - hullSizeCrouch);
+        Vector viewDelta = -VIEW_SCALE * (hullSizeNormal - hullSizeCrouch);
 
         VectorAdd(newOrigin, viewDelta, newOrigin);
     }
@@ -895,9 +914,7 @@ void CMomentumGameMovement::FinishDuck(void)
     Vector hullSizeNormal = VEC_HULL_MAX - VEC_HULL_MIN;
     Vector hullSizeCrouch = VEC_DUCK_HULL_MAX - VEC_DUCK_HULL_MIN;
 
-    float viewScale = g_pGameModeSystem->GameModeIs(GAMEMODE_RJ) ? 1.0f : 0.5f;
-
-    Vector viewDelta = viewScale * (hullSizeNormal - hullSizeCrouch);
+    Vector viewDelta = VIEW_SCALE * (hullSizeNormal - hullSizeCrouch);
 
     player->SetViewOffset(GetPlayerViewOffset(true));
     player->AddFlag(FL_DUCKING);
@@ -907,7 +924,7 @@ void CMomentumGameMovement::FinishDuck(void)
     {
         Vector org = mv->GetAbsOrigin();
 
-        if (player->GetGroundEntity() != nullptr)
+        if (player->GetGroundEntity() != nullptr || m_pPlayer->m_CurrentSlideTrigger)
         {
             org -= VEC_DUCK_HULL_MIN - VEC_HULL_MIN;
         }
@@ -1214,11 +1231,6 @@ void CMomentumGameMovement::CategorizePosition()
     point[1] = bumpOrigin[1];
     point[2] = bumpOrigin[2] - flOffset;
 
-// Shooting up really fast.  Definitely not on ground.
-// On ladder moving up, so not on ground either
-// NOTE: 145 is a jump.
-#define NON_JUMP_VELOCITY ( g_pGameModeSystem->GameModeIs(GAMEMODE_RJ) ? 250.0f : 140.0f )
-
     float zvel = mv->m_vecVelocity[2];
     bool bMovingUp = zvel > 0.0f;
     bool bMovingUpRapidly = zvel > NON_JUMP_VELOCITY;
@@ -1269,9 +1281,7 @@ void CMomentumGameMovement::CategorizePosition()
         }
         else
         {
-            // Make sure we check clip velocity on slopes/surfs before setting the ground entity and nulling out
-            // velocity.z
-            if (sv_slope_fix.GetBool() && player->GetGroundEntity() == nullptr)
+            if (player->GetGroundEntity() == nullptr)
             {
                 Vector rampVelocity = mv->m_vecVelocity;
 
@@ -1291,11 +1301,27 @@ void CMomentumGameMovement::CategorizePosition()
                 // Set ground entity if the player is not going to slide on the ramp next tick
                 if (rampVelocity[2] <= NON_JUMP_VELOCITY)
                 {
+                    // Make sure we check clip velocity on slopes/surfs before setting the ground entity and nulling out
+                    // velocity.z
+                    if (sv_slope_fix.GetBool() && rampVelocity.Length2DSqr() > mv->m_vecVelocity.Length2DSqr())
+                    {
+                        VectorCopy(rampVelocity, mv->m_vecVelocity);
+                    }
+                    
                     SetGroundEntity(&pm);
                 }
             }
             else
             {
+                // This is not necessary to do for other gamemodes as they do not reset the vertical velocity before WalkMove()
+                if (g_pGameModeSystem->GameModeIs(GAMEMODE_RJ) && player->GetGroundEntity() != nullptr &&
+                    player->GetMoveType() == MOVETYPE_WALK && player->GetWaterLevel() < WL_Eyes)
+                {
+                    Vector org = mv->GetAbsOrigin();
+                    org.z = pm.endpos.z;
+                    mv->SetAbsOrigin(org);
+                }
+                
                 SetGroundEntity(&pm); // Otherwise, point to index of ent under us.
             }
         }
@@ -1896,6 +1922,7 @@ int CMomentumGameMovement::TryPlayerMove(Vector *pFirstDest, trace_t *pFirstTrac
                 float offsets[] = {(bumpcount * 2) * -sv_ramp_initial_retrace_length.GetFloat(), 0.0f,
                                    (bumpcount * 2) * sv_ramp_initial_retrace_length.GetFloat()};
                 int valid_planes = 0;
+                valid_plane.Init(0.0f, 0.0f, 0.0f);
 
                 // we have 0 plane info, so lets increase our bbox and search in all 27 directions to get a valid plane!
                 for (i = 0; i < 3; i++)
@@ -1945,7 +1972,7 @@ int CMomentumGameMovement::TryPlayerMove(Vector *pFirstDest, trace_t *pFirstTrac
                 if (valid_planes && !CloseEnough(valid_plane, Vector(0.0f, 0.0f, 0.0f), FLT_EPSILON))
                 {
                     has_valid_plane = true;
-                    valid_plane /= (float)valid_planes;
+                    valid_plane.NormalizeInPlace();
                     continue;
                 }
             }
@@ -2339,7 +2366,8 @@ void CMomentumGameMovement::SetGroundEntity(trace_t *pm)
 {
     // We check jump button because the player might want jumping while sliding
     // And it's more fun like this
-    if (m_pPlayer->m_CurrentSlideTrigger && !((mv->m_nButtons & IN_JUMP) && m_pPlayer->m_CurrentSlideTrigger->m_bAllowingJump))
+    if (m_pPlayer->m_CurrentSlideTrigger &&
+        !(m_pPlayer->HasAutoBhop() && (mv->m_nButtons & IN_JUMP) && m_pPlayer->m_CurrentSlideTrigger->m_bAllowingJump))
         pm = nullptr;
 
     CBaseEntity *newGround = pm ? pm->m_pEnt : nullptr;
@@ -2506,7 +2534,7 @@ void CMomentumGameMovement::CheckFalling(void)
 //            overbounce -
 // Output : int
 //-----------------------------------------------------------------------------
-int CMomentumGameMovement::ClipVelocity(Vector &in, Vector &normal, Vector &out, float overbounce)
+int CMomentumGameMovement::ClipVelocity(Vector in, Vector &normal, Vector &out, float overbounce)
 {
     float backoff;
     float change;
@@ -2538,24 +2566,24 @@ int CMomentumGameMovement::ClipVelocity(Vector &in, Vector &normal, Vector &out,
         out -= (normal * adjust);
         // DevMsg( "Adjustment = %lf\n", adjust );
     }
-
-    // Check if we loose speed while going on a slope in front of us.
-
-    // MOM_TODO: Make this only bhop gametype?
-    // Enable this when we know that we are sliding.
-    Vector dif = mv->m_vecVelocity - out;
-    if ((dif.Length2D() > 0.0f && (angle >= 0.7f) && (out[2] > 0.0f)) &&
-        (m_pPlayer->m_CurrentSlideTrigger && m_pPlayer->m_CurrentSlideTrigger->m_bFixUpsideSlope))
+    
+    // Check if the jump button is held to predict if the player wants to jump up an incline. Not checking for jumping
+    // could allow players that hit the slope almost perpendicularly and still surf up the slope because they would
+    // retain their horizontal speed
+    if (sv_slope_fix.GetBool() && m_pPlayer->HasAutoBhop() && (mv->m_nButtons & IN_JUMP))
     {
-        out.x = mv->m_vecVelocity.x;
-        out.y = mv->m_vecVelocity.y;
-        // Avoid being stuck into the slope.. Or velocity reset incoming!
-        // (Could be better by being more close to the slope, but for player it seems to be close enough)
-        // @Gocnak: Technically the "adjust" code above does this, but to each axis, with a much higher value.
-        // Tickrate will work, but keep in mind tickrates can get pretty big, though realistically this will be
-        // 0.015 or 0.01
-        mv->m_vecAbsOrigin.z += abs(dif.z);
-        DevMsg(2, "ClipVelocity: Fixed speed.\n");
+        bool canJump = angle >= 0.7f && out.z <= NON_JUMP_VELOCITY;
+        
+        if (m_pPlayer->m_CurrentSlideTrigger)
+            canJump &= m_pPlayer->m_CurrentSlideTrigger->m_bAllowingJump;
+        
+        // If the player do not gain horizontal speed while going up an incline, then act as if the surface is flat
+        if (canJump && normal.x*in.x + normal.y*in.y < 0.0f && out.Length2DSqr() <= in.Length2DSqr())
+        {
+            out.x = in.x;
+            out.y = in.y;
+            out.z = 0.0f;
+        }
     }
 
     // Return blocking flags.

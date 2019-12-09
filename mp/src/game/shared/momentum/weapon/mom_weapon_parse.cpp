@@ -23,18 +23,16 @@ CWeaponInfo *GetWeaponInfo(CWeaponID weaponID)
         return nullptr;
     }
 
-    CWeaponInfo *pWeaponInfo = dynamic_cast<CWeaponInfo *>(GetFileWeaponInfoFromHandle(hWpnInfo));
-
-    return pWeaponInfo;
+    return static_cast<CWeaponInfo *>(GetFileWeaponInfoFromHandle(hWpnInfo));
 }
 
 CWeaponInfo::CWeaponInfo()
-    : m_iCrosshairMinDistance(4), m_iCrosshairDeltaDistance(3), m_iPenetration(1), m_iDamage(42),
-      m_flRange(8192.0f), m_flRangeModifier(0.98f), m_iBullets(1)
+    : m_iCrosshairMinDistance(4), m_iCrosshairDeltaDistance(3)
 {
-    m_szAddonModel[0] = '\0';
-    m_szDroppedModel[0] = '\0';
-    m_szSilencerModel[0] = '\0';
+    m_szExplosionEffect[0] = '\0';
+    m_szExplosionPlayerEffect[0] = '\0';
+    m_szExplosionSound[0] = '\0';
+    m_szExplosionWaterEffect[0] = '\0';
 }
 
 FileWeaponInfo_t *CreateWeaponInfo() { return new CWeaponInfo(); }
@@ -46,20 +44,30 @@ void CWeaponInfo::Parse(KeyValues *pKeyValuesData, const char *szWeaponName)
     m_iCrosshairMinDistance = pKeyValuesData->GetInt("CrosshairMinDistance", 4);
     m_iCrosshairDeltaDistance = pKeyValuesData->GetInt("CrosshairDeltaDistance", 3);
 
-    m_iPenetration = pKeyValuesData->GetInt("Penetration", 1);
-    m_iDamage = pKeyValuesData->GetInt("Damage", 42); // Douglas Adams 1952 - 2001
-    m_flRange = pKeyValuesData->GetFloat("Range", 8192.0f);
-    m_flRangeModifier = pKeyValuesData->GetFloat("RangeModifier", 0.98f);
-    m_iBullets = pKeyValuesData->GetInt("Bullets", 1);
+    // Explosion effects
+    const char *pszSound = pKeyValuesData->GetString("ExplosionSound", nullptr);
+    if (pszSound)
+    {
+        Q_strncpy(m_szExplosionSound, pszSound, sizeof(m_szExplosionSound));
+    }
 
-    // Read the addon model.
-    Q_strncpy(m_szAddonModel, pKeyValuesData->GetString("AddonModel"), sizeof(m_szAddonModel));
+    const char *pszEffect = pKeyValuesData->GetString("ExplosionEffect", nullptr);
+    if (pszEffect)
+    {
+        Q_strncpy(m_szExplosionEffect, pszEffect, sizeof(m_szExplosionEffect));
+    }
 
-    // Read the dropped model.
-    Q_strncpy(m_szDroppedModel, pKeyValuesData->GetString("DroppedModel"), sizeof(m_szDroppedModel));
+    pszEffect = pKeyValuesData->GetString("ExplosionPlayerEffect", nullptr);
+    if (pszEffect)
+    {
+        Q_strncpy(m_szExplosionPlayerEffect, pszEffect, sizeof(m_szExplosionPlayerEffect));
+    }
 
-    // Read the silencer model.
-    Q_strncpy(m_szSilencerModel, pKeyValuesData->GetString("SilencerModel"), sizeof(m_szSilencerModel));
+    pszEffect = pKeyValuesData->GetString("ExplosionWaterEffect", nullptr);
+    if (pszEffect)
+    {
+        Q_strncpy(m_szExplosionWaterEffect, pszEffect, sizeof(m_szExplosionWaterEffect));
+    }
 
 #ifndef CLIENT_DLL
     // Enforce consistency for the weapon here, since that way we don't need to save off the model bounds
@@ -68,13 +76,5 @@ void CWeaponInfo::Parse(KeyValues *pKeyValuesData, const char *szWeaponName)
 
     // Model bounds are rounded to the nearest integer, then extended by 1
     engine->ForceModelBounds(szWorldModel, Vector(-15, -12, -18), Vector(44, 16, 19));
-    if (m_szAddonModel[0])
-    {
-        engine->ForceModelBounds(m_szAddonModel, Vector(-5, -5, -6), Vector(13, 5, 7));
-    }
-    if (m_szSilencerModel[0])
-    {
-        engine->ForceModelBounds(m_szSilencerModel, Vector(-15, -12, -18), Vector(44, 16, 19));
-    }
-#endif // !CLIENT_DLL
+#endif
 }

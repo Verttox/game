@@ -82,11 +82,11 @@ CBaseCombatWeapon::CBaseCombatWeapon()
 
 #if defined( CLIENT_DLL )
 	m_iState = m_iOldState = WEAPON_NOT_CARRIED;
+#endif
 	m_iClip1 = -1;
 	m_iClip2 = -1;
 	m_iPrimaryAmmoType = -1;
 	m_iSecondaryAmmoType = -1;
-#endif
 
 #if !defined( CLIENT_DLL )
 	m_pConstraint = NULL;
@@ -248,39 +248,11 @@ void CBaseCombatWeapon::Precache( void )
 	Assert( Q_strlen( GetClassname() ) > 0 );
 	// Msg( "Client got %s\n", GetClassname() );
 #endif
-	m_iPrimaryAmmoType = m_iSecondaryAmmoType = -1;
 
 	// Add this weapon to the weapon registry, and get our index into it
 	// Get weapon data from script file
 	if ( ReadWeaponDataFromFileForSlot( filesystem, GetClassname(), &m_hWeaponFileInfo, GetEncryptionKey() ) )
 	{
-		// Get the ammo indexes for the ammo's specified in the data file
-		if ( GetWpnData().szAmmo1[0] )
-		{
-			m_iPrimaryAmmoType = GetAmmoDef()->Index( GetWpnData().szAmmo1 );
-			if (m_iPrimaryAmmoType == -1)
-			{
-				Msg("ERROR: Weapon (%s) using undefined primary ammo type (%s)\n",GetClassname(), GetWpnData().szAmmo1);
-			}
- #if defined ( TF_DLL ) || defined ( TF_CLIENT_DLL )
-			// Ammo override
-			int iModUseMetalOverride = 0;
-			CALL_ATTRIB_HOOK_INT( iModUseMetalOverride, mod_use_metal_ammo_type );
-			if ( iModUseMetalOverride )
-			{
-				m_iPrimaryAmmoType = (int)TF_AMMO_METAL;
-			}
-#endif
- 		}
-		if ( GetWpnData().szAmmo2[0] )
-		{
-			m_iSecondaryAmmoType = GetAmmoDef()->Index( GetWpnData().szAmmo2 );
-			if (m_iSecondaryAmmoType == -1)
-			{
-				Msg("ERROR: Weapon (%s) using undefined secondary ammo type (%s)\n",GetClassname(),GetWpnData().szAmmo2);
-			}
-
-		}
 #if defined( CLIENT_DLL )
 		gWR.LoadWeaponSprites( GetWeaponFileInfoHandle() );
 #endif
@@ -1418,12 +1390,12 @@ bool CBaseCombatWeapon::DefaultDeploy( char *szViewModel, char *szWeaponModel, i
 		SetViewModel();
 		SendWeaponAnim( iActivity );
 
-		pOwner->SetNextAttack( gpGlobals->curtime + SequenceDuration() );
+		pOwner->SetNextAttack( gpGlobals->curtime + DeployTime() );
 	}
 
 	// Can't shoot again until we've finished deploying
-	m_flNextPrimaryAttack	= gpGlobals->curtime + SequenceDuration();
-	m_flNextSecondaryAttack	= gpGlobals->curtime + SequenceDuration();
+	m_flNextPrimaryAttack	= gpGlobals->curtime + DeployTime();
+	m_flNextSecondaryAttack	= gpGlobals->curtime + DeployTime();
 	m_flHudHintMinDisplayTime = 0;
 
 	m_bAltFireHudHintDisplayed = false;

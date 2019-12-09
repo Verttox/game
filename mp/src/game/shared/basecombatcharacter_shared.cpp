@@ -132,16 +132,11 @@ void CBaseCombatCharacter::RemoveAmmo( int iCount, int iAmmoIndex )
 		return;
 
 	// Infinite ammo?
-	if ( GetAmmoDef()->MaxCarry( iAmmoIndex ) == INFINITE_AMMO )
+	if ( g_pAmmoDef->MaxCarry( iAmmoIndex ) == INFINITE_AMMO )
 		return;
 
 	// Ammo pickup sound
 	m_iAmmo.Set( iAmmoIndex, MAX( m_iAmmo[iAmmoIndex] - iCount, 0 ) );
-}
-
-void CBaseCombatCharacter::RemoveAmmo( int iCount, const char *szName )
-{
-	RemoveAmmo( iCount, GetAmmoDef()->Index(szName) );
 }
 
 //-----------------------------------------------------------------------------
@@ -176,18 +171,10 @@ int CBaseCombatCharacter::GetAmmoCount( int iAmmoIndex ) const
 		return 0;
 
 	// Infinite ammo?
-	if ( GetAmmoDef()->MaxCarry( iAmmoIndex ) == INFINITE_AMMO )
+	if ( g_pAmmoDef->MaxCarry( iAmmoIndex ) == INFINITE_AMMO )
 		return 999;
 
 	return m_iAmmo[ iAmmoIndex ];
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Returns the amount of ammunition of the specified type the character's carrying
-//-----------------------------------------------------------------------------
-int	CBaseCombatCharacter::GetAmmoCount( char *szName ) const
-{
-	return GetAmmoCount( GetAmmoDef()->Index(szName) );
 }
 
 //-----------------------------------------------------------------------------
