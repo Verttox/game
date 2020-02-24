@@ -14,6 +14,7 @@
         "MOM_Weapon_Shotgun" "For Zombie Invasions Only"
         "MOM_Weapon_Sniper" "360 Noscoper"
         "MOM_Weapon_RocketLauncher" "Controlled Combustion"
+        "MOM_Weapon_StickybombLauncher" "Something Stickied This Way Comes"
 
         "MOM_Weapon_SwitchToSemiAuto" "Switched to Semi-Auto mode"
         "MOM_Weapon_SwitchToBurstFire" "Switched to Burst Fire mode"
@@ -178,7 +179,8 @@
         "MOM_GameType_Surf" "Surf"
         "MOM_GameType_Bhop" "Bhop"
         "MOM_GameType_KZ" "Climb (KZ)"
-        "MOM_GameType_RJ" "Jump"
+        "MOM_GameType_RJ" "Rocket Jump"
+        "MOM_GameType_SJ" "Sticky Jump"
         "MOM_GameType_Tricksurf" "Tricksurf"
         "MOM_GameType_Trikz" "Trikz"
 
@@ -199,6 +201,10 @@
         // UI stuff
         "MOM_Jump" "JUMP"
         "MOM_Duck" "DUCK"
+        "MOM_M1"   "M1"
+        "MOM_M2"   "M2"
+        "GameUI_Tonemap" "HDR Tonemapping"
+        "GameUI_Bloom"   "HDR Bloom"
 
         // Map Finished Panel
         //Overall
@@ -367,6 +373,30 @@
         "MOM_Settings_Online_Trails" "Enable online ghost trails"
         "MOM_Settings_Online_Trails_TT" "When enabled, other players can have a trail showing their paths"
         
+        // Rocket Jump settings
+        "MOM_Settings_Tab_RJ" "RJ"
+        "MOM_Settings_RJ_None" "None"
+        "MOM_Settings_RJ_TF2" "TF2"
+        "MOM_Settings_RJ_Enable_TF_RocketModel" "Use TF2 rocket model"
+        "MOM_Settings_RJ_Enable_TF_ViewModel" "Use TF2 view model"
+        "MOM_Settings_RJ_Enable_Center_Fire" "Fire projectiles from screen center"
+        "MOM_Settings_RJ_Particle_Label" "Explosion particles"
+        "MOM_Settings_RJ_Particle_Tooltip" "You can use custom particles by editing the value of the 'ExplosionEffect' fields in the rocket weapon script file."
+        "MOM_Settings_RJ_Sounds_Label" "Explosion and firing sounds"
+        "MOM_Settings_RJ_Trail_Label" "Trail effect"
+        "MOM_Settings_RJ_Trail_Sound_Enable" "Use rocket trail sound"
+        "MOM_Settings_RJ_Trail_Sound_Enable_TT" "When enabled, rockets fired will have a sound following it."
+        "MOM_Settings_RJ_Rocket_Decals_Enable" "Enable rocket decals"
+        "MOM_Settings_RJ_Rocket_Decals_Enable_TT" "When enabled, rockets will create decals upon explosion."
+		
+        // Sticky Jump settings
+        "MOM_Settings_Tab_SJ" "SJ"
+        "MOM_Settings_SJ_Enable_Charge" "Enable charge mechanic"
+        "MOM_Settings_SJ_Enable_ChargeMeter" "Enable charge meter"
+        "MOM_Settings_SJ_Enable_Sticky_Counter" "Enable stickybomb counter"
+        "MOM_Settings_SJ_DrawDelayEntry_Label" "Delay before stickybombs are rendered"
+        "MOM_Settings_SJ_DrawDelayEntry_Tooltip" "In seconds. Default is 0.1, max 1."
+        "MOM_Settings_SJ_Enable_Charge_Tooltip" "Disabling will make stickybombs deploy instantly when holding primary fire."
 
         // Replay Info
         // Spec GUI
@@ -456,6 +486,8 @@
 
         "MOM_MB_DeleteRunConfirmation" "NOTE: If you delete a local run, keep in mind that there's currently no way to get it back!"
 
+        "MOM_Momentum" "Momentum"
+
         // Paint gun panel
         "MOM_PaintGunPanel_SliderText" "Decal scale:"
         "MOM_PaintGunPanel_Viewmodel" "Paintgun Viewmodel Visible"
@@ -489,7 +521,6 @@
         "GameUI2_InviteLobby" "Invite friends"
 
         // Main menu
-        "GameUI2_LogoLeft" "Momentum"
         "GameUI2_LogoRight" "Mod"
 
         "GameUI2_ResumeGame" "RESUME GAME"

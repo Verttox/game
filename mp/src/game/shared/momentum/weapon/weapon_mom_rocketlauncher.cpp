@@ -11,9 +11,7 @@
 
 #include "tier0/memdbgon.h"
 
-#define MOM_ROCKETLAUNCHER_MODEL "models/weapons/v_rpg_edit.mdl"
 #define TF_ROCKETLAUNCHER_MODEL "models/weapons/v_models/v_rocketlauncher_soldier.mdl"
-#define MOM_ROCKETLAUNCHER_WMODEL "models/weapons/w_rocket_launcher.mdl"
 #define TF_ROCKETLAUNCHER_WMODEL "models/weapons/w_models/w_rocketlauncher.mdl"
 
 IMPLEMENT_NETWORKCLASS_ALIASED(MomentumRocketLauncher, DT_MomentumRocketLauncher)
@@ -34,7 +32,7 @@ LINK_ENTITY_TO_CLASS(weapon_momentum_rocketlauncher, CMomentumRocketLauncher);
 PRECACHE_WEAPON_REGISTER(weapon_momentum_rocketlauncher);
 
 #ifdef GAME_DLL
-static MAKE_TOGGLE_CONVAR_CV(mom_rj_center_fire, "0", FCVAR_ARCHIVE, "If enabled, all rockets will be fired from the center of the screen. 0 = OFF, 1 = ON\n", nullptr,
+static MAKE_TOGGLE_CONVAR_CV(mom_rj_center_fire, "1", FCVAR_ARCHIVE, "If enabled, all rockets will be fired from the center of the screen. 0 = OFF, 1 = ON\n", nullptr,
     [](IConVar *pVar, const char *pNewVal)
     {
         if (g_pMomentumTimer->IsRunning())
@@ -56,14 +54,16 @@ CMomentumRocketLauncher::CMomentumRocketLauncher()
 {
     m_flTimeToIdleAfterFire = 0.8f;
     m_flIdleInterval = 20.0f;
+    m_iTFViewIndex = -1;
+    m_iTFWorldIndex = -1;
 }
 
 void CMomentumRocketLauncher::Precache()
 {
     BaseClass::Precache();
 
-    m_iMomViewIndex = PrecacheModel(MOM_ROCKETLAUNCHER_MODEL);
-    m_iMomWorldIndex = PrecacheModel(MOM_ROCKETLAUNCHER_WMODEL);
+    m_iMomViewIndex = m_iViewModelIndex;
+    m_iMomWorldIndex = m_iWorldModelIndex;
     m_iTFViewIndex = PrecacheModel(TF_ROCKETLAUNCHER_MODEL);
     m_iTFWorldIndex = PrecacheModel(TF_ROCKETLAUNCHER_WMODEL);
 
@@ -86,14 +86,14 @@ bool CMomentumRocketLauncher::Deploy()
     return BaseClass::Deploy();
 }
 
-const char *CMomentumRocketLauncher::GetViewModel(int) const
+const char *CMomentumRocketLauncher::GetViewModel(int indx) const
 {
-    return m_iViewModelIndex == m_iTFViewIndex ? TF_ROCKETLAUNCHER_MODEL : MOM_ROCKETLAUNCHER_MODEL;
+    return m_iViewModelIndex == m_iTFViewIndex ? TF_ROCKETLAUNCHER_MODEL : BaseClass::GetViewModel(indx);
 }
 
 const char *CMomentumRocketLauncher::GetWorldModel() const
 {
-    return m_iWorldModelIndex == m_iTFWorldIndex ? TF_ROCKETLAUNCHER_WMODEL : MOM_ROCKETLAUNCHER_WMODEL;
+    return m_iWorldModelIndex == m_iTFWorldIndex ? TF_ROCKETLAUNCHER_WMODEL : BaseClass::GetWorldModel();
 }
 
 void CMomentumRocketLauncher::SetModelType(bool bTF2Model)
@@ -173,11 +173,11 @@ void CMomentumRocketLauncher::PrimaryAttack()
 
     if (mom_rj_sounds.GetInt() == 1)
     {
-        WeaponSound(SINGLE);
+        WeaponSound(GetWeaponSound("single_shot"));
     }
     else if (mom_rj_sounds.GetInt() == 2)
     {
-        WeaponSound(SPECIAL1);
+        WeaponSound(GetWeaponSound("single_shot_TF2"));
     }
 
     // MOM_FIXME:

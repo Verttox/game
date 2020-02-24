@@ -7,7 +7,7 @@
 		"xpos"		"719"
 		"ypos"		"406"
 		"wide"		"482"
-		"tall"		"510" [!$OSX]
+		"tall"		"450" [!$OSX]
 		"tall"		"358" [$OSX]
 		"autoResize"		"0"
 		"pinCorner"		"0"
@@ -243,26 +243,6 @@
 		"wrap"		"0"
 		"Default"		"0"
 	}
-	"dxlabel"
-	{
-		"ControlName"		"ComboBox"
-		"fieldName"		"dxlabel"
-		"xpos"		"330"
-		"ypos"		"385"
-		"wide"		"132"
-		"tall"		"24"
-		"autoResize"		"0"
-		"pinCorner"		"0"
-		"visible"		"1" [!$POSIX]
-		"visible"		"0" [$POSIX]
-		"enabled"		"0"
-		"tabPosition"		"14"
-		"textHidden"		"0"
-		"editable"		"0"
-		"maxchars"		"-1"
-		"NumericInputOnly"		"0"
-		"unicode"		"0"
-	}
 	"ModelDetail"
 	{
 		"ControlName"		"ComboBox"
@@ -358,10 +338,10 @@
 		"NumericInputOnly"		"0"
 		"unicode"		"0"
 	}
-	"HDR"
+	"Bloom"
 	{
 		"ControlName"		"ComboBox"
-		"fieldName"		"HDR"
+		"fieldName"		"Bloom"
 		"xpos"		"22"
 		"ypos"		"316"
 		"wide"		"132"
@@ -371,7 +351,7 @@
 		"visible"		"1" [!$OSX]
 		"visible"		"0" [$OSX]
 		"enabled"		"1"
-		"tabPosition"		"12"
+		"tabPosition"		"5"
 		"textHidden"		"0"
 		"editable"		"0"
 		"maxchars"		"-1"
@@ -473,28 +453,6 @@
 		"NumericInputOnly"		"0"
 		"unicode"		"0"
 	}
-	"Bloom"
-	{
-		"ControlName"		"CvarToggleCheckButton"
-		"fieldName"		"Bloom"
-		"xpos"		"170"
-		"ypos"		"316"
-		"wide"		"292"
-		"tall"		"24"
-		"autoResize"		"0"
-		"pinCorner"		"0"
-		"visible"		"1" [!$OSX]
-		"visible"		"0" [$OSX]
-		"enabled"		"1"
-		"tabPosition"		"13"
-		"labelText"		"#GameUI_Bloom"
-		"textAlignment"		"west"
-		"dulltext"		"0"
-		"brighttext"		"0"
-		"wrap"		"0"
-		"Default"		"0"
-		"selected"		"0"
-	}
 	"Motion Blur Label"
 	{
 		"ControlName"		"Label"
@@ -510,7 +468,47 @@
 		"tabPosition"		"0"
 		"labelText"		"#GameUI_MotionBlur"
 		"textAlignment"		"west"
-		"associate"		"HDR"
+		"associate"		"MotionBlur"
+		"dulltext"		"0"
+		"brighttext"		"0"
+		"wrap"		"0"
+	}
+	"Tonemap"
+	{
+		"ControlName"		"ComboBox"
+		"fieldName"		"Tonemap"
+		"xpos"		"176"
+		"ypos"		"316"
+		"wide"		"132"
+		"tall"		"24"
+		"autoResize"		"0"
+		"pinCorner"		"0"
+		"visible"		"1" [!$OSX]
+		"visible"		"0" [$OSX]
+		"enabled"		"1"
+		"tabPosition"		"5"
+		"textHidden"		"0"
+		"editable"		"0"
+		"maxchars"		"-1"
+		"NumericInputOnly"		"0"
+		"unicode"		"0"
+	}
+	"Tonemap Label"
+	{
+		"ControlName"		"Label"
+		"fieldName"		"Tonemap Label"
+		"xpos"		"176"
+		"ypos"		"292"
+		"wide"		"175"
+		"tall"		"24"
+		"autoResize"		"0"
+		"pinCorner"		"0"
+		"visible"		"1"
+		"enabled"		"1"
+		"tabPosition"		"0"
+		"labelText"		"#GameUI_Tonemap"
+		"textAlignment"		"west"
+		"associate"		"Tonemap"
 		"dulltext"		"0"
 		"brighttext"		"0"
 		"wrap"		"0"
@@ -520,7 +518,7 @@
 		"ControlName"		"Button"
 		"fieldName"		"Button1"
 		"xpos"		"290"
-		"ypos"		"468" [!$OSX]
+		"ypos"		"408" [!$OSX]
 		"ypos"		"316" [$OSX]
 		"wide"		"80"
 		"tall"		"24"
@@ -543,7 +541,7 @@
 		"ControlName"		"Button"
 		"fieldName"		"Button2"
 		"xpos"		"382"
-		"ypos"		"468" [!$OSX]
+		"ypos"		"408" [!$OSX]
 		"ypos"		"316" [$OSX]
 		"wide"		"80"
 		"tall"		"24"
@@ -560,26 +558,6 @@
 		"Command"		"Close"
 		"Default"		"0"
 		"selected"		"0"
-	}
-	"Label1"
-	{
-		"ControlName"		"Label"
-		"fieldName"		"Label1"
-		"xpos"		"22"
-		"ypos"		"385"
-		"wide"		"288"
-		"tall"		"24"
-		"autoResize"		"0"
-		"pinCorner"		"0"
-		"visible"		"1" [!$POSIX]
-		"visible"		"0" [$POSIX]
-		"enabled"		"1"
-		"tabPosition"		"0"
-		"labelText"		"#GameUI_DX_Level"
-		"textAlignment"		"east"
-		"dulltext"		"0"
-		"brighttext"		"0"
-		"wrap"		"0"
 	}
 	"Label2"
 	{
@@ -695,7 +673,7 @@
 		"visible"		"0" [$POSIX]
 		"enabled"		"1"
 		"tabPosition"		"0"
-		"labelText"		"DirectX v9.0"
+		"labelText"		"DirectX v9.0+"
 		"textAlignment"		"west"
 		"dulltext"		"0"
 		"brighttext"		"0"
@@ -821,7 +799,7 @@
 		"ControlName"		"Label"
 		"fieldName"		"Label11"
 		"xpos"		"18"
-		"ypos"		"442" [!$OSX]
+		"ypos"		"382" [!$OSX]
 		"ypos"		"310" [$OSX]
 		"wide"		"280"
 		"tall"		"24"
@@ -837,10 +815,10 @@
 		"Font"		"DefaultSmall"
 		"wrap"		"0"
 	}
-	"HDR Label"
+	"BloomLabel"
 	{
 		"ControlName"		"Label"
-		"fieldName"		"HDR Label"
+		"fieldName"		"BloomLabel"
 		"xpos"		"22"
 		"ypos"		"292"
 		"wide"		"138"
@@ -851,9 +829,9 @@
 		"visible"		"0" [$OSX]
 		"enabled"		"1"
 		"tabPosition"		"0"
-		"labelText"		"#GameUI_HDR"
+		"labelText"		"#GameUI_Bloom"
 		"textAlignment"		"west"
-		"associate"		"HDR"
+		"associate"		"Bloom"
 		"dulltext"		"0"
 		"brighttext"		"0"
 		"wrap"		"0"
@@ -961,46 +939,6 @@
 		"editable"		"0"
 		"maxchars"		"-1"
 		"NumericInputOnly"		"0"
-		"unicode"		"0"
-	}
-	"D3D9ExLabel"
-	{
-		"ControlName"	"Label"
-		"fieldName"		"D3D9ExLabel"
-		"xpos"			"22"
-		"ypos"			"410"
-		"wide"			"288"
-		"tall"			"24"
-		"autoResize"	"0"
-		"pinCorner"		"0"
-		"visible"		"1" [!$POSIX]
-		"visible"		"0" [$POSIX]
-		"enabled"		"1"
-		"tabPosition"	"0"
-		"labelText"		"#GameUI_D3D9Ex"
-		"textAlignment"	"east"
-		"dulltext"		"0"
-		"brighttext"	"0"
-		"wrap"			"0"
-	}
-	"D3D9Ex"
-	{
-		"ControlName"	"ComboBox"
-		"fieldName"		"D3D9Ex"
-		"xpos"			"330"
-		"ypos"			"410"
-		"wide"			"132"
-		"tall"			"24"
-		"autoResize"	"0"
-		"pinCorner"		"0"
-		"visible"		"1" [!$POSIX]
-		"visible"		"0" [$POSIX]
-		"enabled"		"1"
-		"tabPosition"	"15"
-		"textHidden"	"0"
-		"editable"		"0"
-		"maxchars"		"-1"
-		"NumericInputOnly" "0"
 		"unicode"		"0"
 	}
 }

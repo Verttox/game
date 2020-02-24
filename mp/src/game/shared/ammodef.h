@@ -1,56 +1,13 @@
 #pragma once
 
-// Ammo is infinite
-#define INFINITE_AMMO (-2)
-
-enum CWeaponID
-{
-    WEAPON_NONE = 0,
-
-    WEAPON_PISTOL,
-    WEAPON_RIFLE,
-    WEAPON_SHOTGUN,
-    WEAPON_SMG,
-    WEAPON_SNIPER,
-    WEAPON_LMG,
-    WEAPON_GRENADE,
-    WEAPON_KNIFE,
-    WEAPON_PAINTGUN,
-    WEAPON_ROCKETLAUNCHER,
-
-    WEAPON_MAX, // number of weapons weapon index
-};
-
-enum AmmoTracer_t
-{
-    TRACER_NONE,
-    TRACER_LINE,
-    TRACER_RAIL,
-    TRACER_BEAM,
-    TRACER_LINE_AND_WHIZ,
-};
-
-enum AmmoType_t
-{
-    AMMO_TYPE_NONE = -1,
-    AMMO_TYPE_PISTOL,
-    AMMO_TYPE_SMG,
-    AMMO_TYPE_RIFLE,
-    AMMO_TYPE_SNIPER,
-    AMMO_TYPE_LMG,
-    AMMO_TYPE_SHOTGUN,
-    AMMO_TYPE_GRENADE,
-    AMMO_TYPE_PAINT,
-
-    AMMO_TYPE_MAX
-};
+#include "weapon/weapon_shareddefs.h"
 
 class CAmmoBase
 {
 public:
     CAmmoBase();
 
-    CWeaponID m_WeaponID;
+    WeaponID_t m_WeaponID;
 
     int     m_iDamageType;
     int     m_iDamageAmount;
@@ -92,7 +49,7 @@ class CAmmoDef
     virtual ~CAmmoDef();
 
     CAmmoBase *GetAmmoOfIndex(int nAmmoIndex);
-    MAKE_AMMODEF_GETTER(CWeaponID, WeaponID, m_WeaponID);
+    MAKE_AMMODEF_GETTER(WeaponID_t, WeaponID, m_WeaponID);
     MAKE_AMMODEF_GETTER(int, DamageType, m_iDamageType);
     MAKE_AMMODEF_GETTER(int, DamageAmount, m_iDamageAmount);
     MAKE_AMMODEF_GETTER(int, TracerType, m_eTracerType);

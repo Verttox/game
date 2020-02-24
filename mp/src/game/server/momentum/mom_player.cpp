@@ -14,6 +14,7 @@
 #include "predicted_viewmodel.h"
 #include "weapon/weapon_base_gun.h"
 #include "weapon/weapon_mom_paintgun.h"
+#include "weapon/weapon_mom_stickybomblauncher.h"
 #include "mom_system_gamemode.h"
 #include "mom_system_saveloc.h"
 #include "util/mom_util.h"
@@ -22,6 +23,7 @@
 #include "mapzones.h"
 #include "fx_mom_shared.h"
 #include "mom_rocket.h"
+#include "mom_stickybomb.h"
 
 #include "tier0/memdbgon.h"
 
@@ -185,7 +187,7 @@ static MAKE_TOGGLE_CONVAR_C(mom_trail_enable, "0", FCVAR_CLIENTCMD_CAN_EXECUTE |
 static CMomentumPlayer *s_pPlayer = nullptr;
 
 CMomentumPlayer::CMomentumPlayer()
-    : m_duckUntilOnGround(false), m_flStamina(0.0f),
+    : m_flStamina(0.0f),
       m_flLastVelocity(0.0f), m_nPerfectSyncTicks(0), m_nStrafeTicks(0), m_nAccelTicks(0),
       m_nPrevButtons(0), m_flTweenVelValue(1.0f), m_bInAirDueToJump(false), m_iProgressNumber(-1)
 {
@@ -224,7 +226,7 @@ CMomentumPlayer::CMomentumPlayer()
         m_pStartZoneMarks[i] = nullptr;
     }
 
-    if (g_pGameModeSystem->GameModeIs(GAMEMODE_RJ))
+    if (g_pGameModeSystem->IsTF2BasedMode())
     {
         gEntList.AddListenerEntity(this);
     }
@@ -235,10 +237,10 @@ CMomentumPlayer::~CMomentumPlayer()
     if (this == s_pPlayer)
         s_pPlayer = nullptr;
 
-    if (g_pGameModeSystem->GameModeIs(GAMEMODE_RJ))
+    if (g_pGameModeSystem->IsTF2BasedMode())
     {
         gEntList.RemoveListenerEntity(this);
-        m_vecRockets.RemoveAll();
+        m_vecExplosives.RemoveAll();
     }
 
     RemoveAllOnehops();
@@ -667,11 +669,14 @@ bool CMomentumPlayer::ClientCommand(const CCommand &args)
     }
     if (FStrEq(cmd, "drop"))
     {
-        CWeaponBase *pWeapon = dynamic_cast<CWeaponBase *>(GetActiveWeapon());
-
-        if (pWeapon && pWeapon->GetWeaponID() != WEAPON_GRENADE)
+        if (!g_pGameModeSystem->IsTF2BasedMode())
         {
-           MomentumWeaponDrop(pWeapon);
+            CWeaponBase *pWeapon = dynamic_cast<CWeaponBase *>(GetActiveWeapon());
+
+            if (pWeapon && pWeapon->GetWeaponID() != WEAPON_GRENADE)
+            {
+                MomentumWeaponDrop(pWeapon);
+            }
         }
 
         return true;
@@ -901,25 +906,31 @@ void CMomentumPlayer::OnZoneEnter(CTriggerZone *pTrigger)
             SetCurrentZoneTrigger(pStartTrigger);
             SetCurrentProgressTrigger(pStartTrigger);
 
-            if (g_pGameModeSystem->GameModeIs(GAMEMODE_RJ))
+            if (g_pGameModeSystem->IsTF2BasedMode())
             {
-                DestroyRockets();
+                if (g_pGameModeSystem->GameModeIs(GAMEMODE_SJ))
+                {
+                    const auto pLauncher = dynamic_cast<CMomentumStickybombLauncher *>(GetActiveWeapon());
+                    if (pLauncher)
+                    {
+                        pLauncher->SetChargeEnabled(false);
+                    }
+                }
 
-                // Don't limit speed in rocketjump mode,
-                // reset timer on zone enter and start on zone leave.
-                g_pMomentumTimer->Reset(this);
+                DestroyExplosives();
+
+                // Don't limit speed in RJ/SJ, start on zone leave.
                 m_bStartTimerOnJump = false;
                 m_bShouldLimitPlayerSpeed = false;
-                break;
+            }
+            
+            if (!(g_pMomentumTimer->IsRunning() || m_bHasPracticeMode))
+            {
+                LimitSpeed(260.0f, false);
             }
 
-            // Limit to 260 if timer is not running and we're not in practice mode
-            if (!(g_pMomentumTimer->IsRunning() || m_bHasPracticeMode))
-                LimitSpeed(260.0f, false);
-
-            // When we start on jump, we reset on land (see OnLand)
             // If we're already on ground we can safely reset now
-            if (GetFlags() & FL_ONGROUND && GetMoveType() == MOVETYPE_WALK && !m_bHasPracticeMode)
+            if ((GetFlags() & FL_ONGROUND) && GetMoveType() == MOVETYPE_WALK && !m_bHasPracticeMode)
             {
                 g_pMomentumTimer->Reset(this);
             }
@@ -1033,6 +1044,16 @@ void CMomentumPlayer::OnZoneExit(CTriggerZone *pTrigger)
     case ZONE_TYPE_CHECKPOINT:
         break;
     case ZONE_TYPE_START:
+        if (g_pGameModeSystem->GameModeIs(GAMEMODE_SJ))
+        {
+            // Re-enable charge on start zone exit and set charge time to 0 to prevent pre-charged stickies
+            const auto pLauncher = dynamic_cast<CMomentumStickybombLauncher *>(GetActiveWeapon());
+            if (pLauncher)
+            {
+                pLauncher->SetChargeEnabled(true);
+                pLauncher->SetChargeBeginTime(0.0f);
+            }
+        }
         // g_pMomentumTimer->CalculateTickIntervalOffset(this, ZONE_TYPE_START, 1);
         g_pMomentumTimer->TryStart(this, true);
         if (m_bShouldLimitPlayerSpeed && !m_bHasPracticeMode && !g_pMOMSavelocSystem->IsUsingSaveLocMenu())
@@ -1084,22 +1105,44 @@ void CMomentumPlayer::OnEntitySpawned(CBaseEntity *pEntity)
 {
     if (pEntity->GetFlags() & FL_GRENADE)
     {
-        const auto pRocket = dynamic_cast<CMomRocket *>(pEntity);
-        if (pRocket)
+        if (FClassnameIs(pEntity, "momentum_rocket"))
         {
-            m_vecRockets.AddToTail(pRocket);
+            const auto pRocket = dynamic_cast<CMomRocket *>(pEntity);
+            if (pRocket && pRocket->GetOwnerEntity() == this)
+            {
+                m_vecExplosives.AddToTail(pRocket);
+            }
+        }
+        else if (FClassnameIs(pEntity, "momentum_stickybomb"))
+        {
+            const auto pSticky = dynamic_cast<CMomStickybomb *>(pEntity);
+            if (pSticky && pSticky->GetOwnerEntity() == this)
+            {
+                m_vecExplosives.AddToTail(pSticky);
+            }
         }
     }
 }
 
 void CMomentumPlayer::OnEntityDeleted(CBaseEntity *pEntity)
 {
-    if ((pEntity->GetFlags() & FL_GRENADE) && !m_vecRockets.IsEmpty())
+    if ((pEntity->GetFlags() & FL_GRENADE) && !m_vecExplosives.IsEmpty())
     {
-        const auto pRocket = dynamic_cast<CMomRocket *>(pEntity);
-        if (pRocket)
+        if (FClassnameIs(pEntity, "momentum_rocket"))
         {
-            m_vecRockets.FindAndRemove(pRocket);
+            const auto pRocket = dynamic_cast<CMomRocket *>(pEntity);
+            if (pRocket && pRocket->GetOwnerEntity() == this)
+            {
+                m_vecExplosives.FindAndRemove(pRocket);
+            }
+        }
+        else if (FClassnameIs(pEntity, "momentum_stickybomb"))
+        {
+            const auto pSticky = dynamic_cast<CMomStickybomb *>(pEntity);
+            if (pSticky && pSticky->GetOwnerEntity() == this)
+            {
+                m_vecExplosives.FindAndRemove(pSticky);
+            }
         }
     }
 }
@@ -1605,6 +1648,11 @@ bool CMomentumPlayer::StartObserverMode(int mode)
         SaveCurrentRunState(false);
         FIRE_GAME_WIDE_EVENT("spec_start");
 
+        // When entering spec mode and returning to the game, stickies that were placed beforehand are not assigned to the player
+        // and cannot be detonated anymore, so they are destroyed here
+        if (g_pGameModeSystem->GameModeIs(GAMEMODE_SJ))
+            DestroyExplosives();
+
         g_pMomentumGhostClient->SetIsSpectating(true);
     }
 
@@ -1651,10 +1699,7 @@ void CMomentumPlayer::TimerCommand_Restart(int track)
     g_pMomentumTimer->Stop(this);
     g_pMomentumTimer->SetCanStart(false);
 
-    if (g_pGameModeSystem->GameModeIs(GAMEMODE_RJ))
-    {
-        DestroyRockets();
-    }
+    DestroyExplosives();
 
     const auto pStart = g_pMomentumTimer->GetStartTrigger(track);
     if (pStart)
@@ -1692,10 +1737,7 @@ void CMomentumPlayer::TimerCommand_Reset()
         const auto pCurrentZone = GetCurrentZoneTrigger();
         if (pCurrentZone)
         {
-            if (g_pGameModeSystem->GameModeIs(GAMEMODE_RJ))
-            {
-                DestroyRockets();
-            }
+            DestroyExplosives();
 
             // MOM_TODO do a trace downwards from the top of the trigger's center to touchable land, teleport the player there
             Teleport(&pCurrentZone->WorldSpaceCenter(), nullptr, &vec3_origin);
@@ -1707,18 +1749,31 @@ void CMomentumPlayer::TimerCommand_Reset()
     }
 }
 
-void CMomentumPlayer::DestroyRockets()
+void CMomentumPlayer::DestroyExplosives()
 {
-    FOR_EACH_VEC(m_vecRockets, i)
+    FOR_EACH_VEC(m_vecExplosives, i)
     {
-        const auto pRocket = m_vecRockets[i];
-        if (pRocket)
+        const auto pExplosive = m_vecExplosives[i];
+        if (pExplosive)
         {
-            pRocket->Destroy(true);
+            if (g_pGameModeSystem->GameModeIs(GAMEMODE_RJ))
+            {
+                const auto pRocket = dynamic_cast<CMomRocket*>(pExplosive);
+
+                if (pRocket)
+                    pRocket->Destroy(true);
+            }
+            if (g_pGameModeSystem->GameModeIs(GAMEMODE_SJ))
+            {
+                const auto pSticky = dynamic_cast<CMomStickybomb*>(pExplosive);
+
+                if (pSticky)
+                    pSticky->RemoveStickybomb(true);
+            }
         }
     }
 
-    m_vecRockets.RemoveAll();
+    m_vecExplosives.RemoveAll();
 }
 
 void CMomentumPlayer::TogglePracticeMode()
@@ -1796,10 +1851,7 @@ void CMomentumPlayer::DisablePracticeMode()
     // Only when timer is running
     if (g_pMomentumTimer->IsRunning())
     {
-        if (g_pGameModeSystem->GameModeIs(GAMEMODE_RJ))
-        {
-            DestroyRockets();
-        }
+        DestroyExplosives();
 
         RestoreRunState(true);
     }
@@ -1900,9 +1952,11 @@ int CMomentumPlayer::OnTakeDamage_Alive(const CTakeDamageInfo &info)
     CBaseEntity *pAttacker = info.GetAttacker();
     CBaseEntity *pInflictor = info.GetInflictor();
 
-    // Handle taking self damage from rockets and pumpkin bombs
+    // Handle taking self damage from rockets, pumpkin bombs and stickies
     if (pAttacker == GetLocalPlayer() &&
-        (FClassnameIs(pInflictor, "momentum_rocket") || FClassnameIs(pInflictor, "momentum_generic_bomb")))
+        (FClassnameIs(pInflictor, "momentum_rocket") 
+         || FClassnameIs(pInflictor, "momentum_generic_bomb")
+         || FClassnameIs(pInflictor, "momentum_stickybomb")))
     {
         // Grab the vector of the incoming attack.
         // (Pretend that the inflictor is a little lower than it really is, so the body will tend to fly upward a bit).
@@ -1931,14 +1985,14 @@ void CMomentumPlayer::ApplyPushFromDamage(const CTakeDamageInfo &info, Vector &v
         return;
 
     CBaseEntity *pAttacker = info.GetAttacker();
+    CBaseEntity *pInflictor = info.GetInflictor();
 
     if (!info.GetInflictor() || GetMoveType() != MOVETYPE_WALK || pAttacker->IsSolidFlagSet(FSOLID_TRIGGER))
         return;
 
-    // Apply different force scale when on ground
-    float flScale = 1.0f;
+    float flScale = 0.0f;
 
-    if (g_pGameModeSystem->GameModeIs(GAMEMODE_RJ))
+    if (FClassnameIs(pInflictor, "momentum_rocket") || FClassnameIs(pInflictor, "momentum_generic_bomb"))
     {
         if (GetFlags() & FL_ONGROUND)
         {
@@ -1954,6 +2008,11 @@ void CMomentumPlayer::ApplyPushFromDamage(const CTakeDamageInfo &info, Vector &v
                 flScale *= MOM_DAMAGESCALE_SELF_ROCKET;
             }
         }
+    }
+
+    if (FClassnameIs(pInflictor, "momentum_stickybomb"))
+    {
+        flScale = 6.75f; // 0.75f * 9.0f
     }
 
     // Scale force if we're ducked

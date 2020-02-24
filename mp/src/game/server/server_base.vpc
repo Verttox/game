@@ -10,7 +10,6 @@ $Macro OUTBINDIR	"$SRCDIR\..\game\$GAMENAME\bin"
 $MacroRequired "GAMENAME"
 
 $include "$SRCDIR\vpc_scripts\source_dll_base.vpc"
-$Include "$SRCDIR\vpc_scripts\source_replay.vpc"	[$TF]
 
 $Configuration	"Debug"
 {
@@ -62,15 +61,6 @@ $Configuration
 
 $Project
 {
-	$Folder "Replay"
-	{
-		$File	"gamedll_replay.cpp"
-		$File	"$SRCDIR\common\replay\ireplaysessionrecorder.h"
-		
-		$File	"$SRCDIR\game\shared\replay_gamestats_shared.cpp"	[$BUILD_REPLAY]
-		$File	"$SRCDIR\game\shared\replay_gamestats_shared.h"	[$BUILD_REPLAY]
-	}
-	
 	$Folder	"Source Files"
 	{
 		$File	"$SRCDIR\game\shared\achievement_saverestore.cpp"
@@ -433,6 +423,7 @@ $Project
 		$File	"locksounds.h"
 		$File	"logic_measure_movement.cpp"
 		$File	"logic_navigation.cpp"
+		$File	"logic_random_outputs.cpp"
 		$File	"logicauto.cpp"
 		$File	"logicentities.cpp"
 		$File	"logicrelay.cpp"
@@ -451,8 +442,6 @@ $Project
 		$File	"movement.cpp"
 		$File	"$SRCDIR\game\shared\movevars_shared.cpp"
 		$File	"movie_explosion.h"
-		$File	"$SRCDIR\game\shared\multiplay_gamerules.cpp"
-		$File	"$SRCDIR\game\shared\multiplay_gamerules.h"
 		$File	"ndebugoverlay.cpp"
 		$File	"ndebugoverlay.h"
 		$File	"networkstringtable_gamedll.h"
@@ -606,8 +595,6 @@ $Project
 		$File	"tanktrain.cpp"
 		$File	"team.cpp"
 		$File	"team.h"
-		$File	"$SRCDIR\game\shared\teamplay_gamerules.cpp"
-		$File	"$SRCDIR\game\shared\teamplay_gamerules.h"
 		$File	"$SRCDIR\game\shared\tempentity.h"
 		$File	"TemplateEntities.cpp"
 		$File	"TemplateEntities.h"
@@ -639,8 +626,6 @@ $Project
 		$File	"WaterLODControl.cpp"
 		$File	"wcedit.cpp"
 		$File	"wcedit.h"
-		$File	"$SRCDIR\game\shared\weapon_parse.cpp"
-		$File	"$SRCDIR\game\shared\weapon_parse.h"
 		$File	"$SRCDIR\game\shared\weapon_proficiency.cpp"
 		$File	"$SRCDIR\game\shared\weapon_proficiency.h"
 		$File	"weight_button.cpp"
@@ -880,6 +865,7 @@ $Project
 		$File	"$SRCDIR\public\tier1\KeyValues.h"
 		$File	"$SRCDIR\common\language.h"
 		$File	"$SRCDIR\public\tier0\l2cache.h"
+		$File	"logic_random_outputs.h"
 		$File	"logicrelay.h"
 		$File	"$SRCDIR\public\map_utils.h"
 		$File	"mapentities.h"

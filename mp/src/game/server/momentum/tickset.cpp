@@ -1,4 +1,5 @@
 #ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
 #include "Windows.h"
 #include "Psapi.h"
 #pragma comment(lib, "psapi.lib")
@@ -95,22 +96,6 @@ bool TickSet::TickInit()
     return interval_per_tick ? true : false;
 }
 
-bool TickSet::SetTickrate(int gameMode)
-{
-    switch (gameMode)
-    {
-    case GAMEMODE_TRICKSURF:
-    case GAMEMODE_BHOP:
-    case GAMEMODE_KZ:
-        //MOM_TODO: add more gamemodes
-        return SetTickrate(s_DefinedRates[TICKRATE_100]);
-    case GAMEMODE_SURF:
-    case GAMEMODE_RJ:
-    default:
-        return SetTickrate(s_DefinedRates[TICKRATE_66]);
-    }
-}
-
 bool TickSet::SetTickrate(float tickrate)
 {
     if (!CloseEnough(m_trCurrent.fTickRate, tickrate, FLT_EPSILON))
@@ -171,6 +156,6 @@ static void OnTickRateChange(IConVar *var, const char* pOldValue, float fOldValu
     TickSet::SetTickrate(tickrate);
 }
 
-static ConVar intervalPerTick("sv_interval_per_tick", "0.015", 0,
-                              "Changes the interval per tick of the engine. Interval per tick is 1/tickrate, so 100 tickrate = 0.01",
-                              true, 0.001f, true, 0.1f, OnTickRateChange);
+MAKE_CONVAR_C(sv_interval_per_tick, "0.015", FCVAR_MAPPING, 
+              "Changes the interval per tick of the engine. Interval per tick is 1/tickrate, so 100 tickrate = 0.01\n",
+              0.001f, 0.1f, OnTickRateChange);

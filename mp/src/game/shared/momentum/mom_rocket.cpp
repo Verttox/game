@@ -1,8 +1,9 @@
 #include "cbase.h"
+
 #include "mom_rocket.h"
 #include "engine/IEngineSound.h"
 #include "mom_shareddefs.h"
-#include "weapon/mom_weapon_parse.h"
+#include "weapon/weapon_def.h"
 
 #ifndef CLIENT_DLL
 #include "Sprite.h"
@@ -19,12 +20,12 @@
 #define MOM_ROCKET_MODEL "models/weapons/w_missile.mdl"
 #define TF_ROCKET_MODEL "models/weapons/w_models/w_rocket.mdl"
 
+#define MOM_TRAIL_PARTICLE_B "mom_rocket_trail_b" // MOM_TODO REMOVEME
+
 #ifndef CLIENT_DLL
 
 BEGIN_DATADESC(CMomRocket)
     // Fields
-    DEFINE_FIELD(m_hOwner, FIELD_EHANDLE),
-    DEFINE_FIELD(m_hRocketTrail, FIELD_EHANDLE),
     DEFINE_FIELD(m_flDamage, FIELD_FLOAT),
 
     // Functions
@@ -38,12 +39,7 @@ BEGIN_NETWORK_TABLE(CMomRocket, DT_MomRocket)
 #ifdef CLIENT_DLL
 RecvPropVector(RECVINFO(m_vInitialVelocity))
 #else
-SendPropVector(SENDINFO(m_vInitialVelocity),
-               20,    // nbits
-               0,     // flags
-               -3000, // low value
-               3000   // high value
-               )
+SendPropVector(SENDINFO(m_vInitialVelocity), 20, 0, -3000, 3000)
 #endif
 END_NETWORK_TABLE();
 
@@ -51,12 +47,12 @@ LINK_ENTITY_TO_CLASS(momentum_rocket, CMomRocket);
 PRECACHE_WEAPON_REGISTER(momentum_rocket);
 
 #ifdef GAME_DLL
-static MAKE_TOGGLE_CONVAR(mom_rj_use_tf_rocketmodel, "0", FCVAR_ARCHIVE,
-                          "Toggles between the TF2 rocket model and the Momentum one. 0 = Momentum, 1 = TF2\n");
-static MAKE_CONVAR(mom_rj_particles, "1", FCVAR_ARCHIVE,
-                   "Toggles between the TF2 particles for explosions and the Momentum ones. 0 = None, 1 = Momentum, 2 = TF2\n", 0, 2);
-static MAKE_CONVAR(mom_rj_trail, "1", FCVAR_ARCHIVE,
-                   "Toggles between the TF2 rocket trail and the Momentum one. 0 = None, 1 = Momentum, 2 = TF2\n", 0, 2);
+static MAKE_TOGGLE_CONVAR(mom_rj_use_tf_rocketmodel, "0", FCVAR_ARCHIVE, "Toggles between the TF2 rocket model and the Momentum one. 0 = Momentum, 1 = TF2\n");
+static MAKE_TOGGLE_CONVAR(mom_rj_trail_sound_enable, "1", FCVAR_ARCHIVE, "Toggles the rocket trail sound. 0 = OFF, 1 = ON\n");
+static MAKE_TOGGLE_CONVAR(mom_rj_decals_enable, "1", FCVAR_ARCHIVE, "Toggles creating decals on rocket explosion. 0 = OFF, 1 = ON\n");
+#else
+static MAKE_CONVAR(mom_rj_trail, "1", FCVAR_ARCHIVE, "Toggles between the TF2 rocket trail and the Momentum one. 0 = None, 1 = Momentum, 2 = TF2\n", 0, 3);
+static MAKE_CONVAR(mom_rj_rocket_drawdelay, "0.2", FCVAR_ARCHIVE, "Determines how long it takes for rockets to start being drawn after spawning.\n", 0, 1);
 #endif
 
 CMomRocket::CMomRocket()
@@ -67,24 +63,43 @@ CMomRocket::CMomRocket()
     m_flSpawnTime = 0.0f;
 #else
     m_flDamage = 0.0f;
-    m_hOwner = nullptr;
-    m_hRocketTrail = nullptr;
 #endif
 }
 
 CMomRocket::~CMomRocket()
 {
+}
+
+void CMomRocket::Spawn()
+{
+    BaseClass::Spawn();
 #ifdef CLIENT_DLL
-    ParticleProp()->StopEmission();
+    m_flSpawnTime = gpGlobals->curtime;
+#else
+    UseClientSideAnimation();
+    SetCollisionGroup(COLLISION_GROUP_PROJECTILE);
+    SetSolidFlags(FSOLID_NOT_STANDABLE);
+    SetMoveType(MOVETYPE_FLY, MOVECOLLIDE_FLY_CUSTOM);
+    SetSolid(SOLID_BBOX);
+    AddEFlags(EFL_NO_WATER_VELOCITY_CHANGE);
+    AddEffects(EF_NOSHADOW);
+    SetSize(Vector(0, 0, 0), Vector(0, 0, 0));
+    AddFlag(FL_GRENADE);
+
+    m_takedamage = DAMAGE_NO;
+    SetGravity(0.0f);
+
+    SetTouch(&CMomRocket::RocketTouch);
+    SetNextThink(gpGlobals->curtime);
 #endif
 }
 
-bool CMomRocket::UseTFTrail()
+void CMomRocket::Precache()
 {
-#ifdef CLIENT_DLL
-    static ConVarRef mom_rj_trail("mom_rj_trail");
-#endif
-    return mom_rj_trail.GetInt() == 2;
+    BaseClass::Precache();
+
+    PrecacheModel(MOM_ROCKET_MODEL);
+    PrecacheModel(TF_ROCKET_MODEL);
 }
 
 #ifdef CLIENT_DLL
@@ -95,24 +110,6 @@ void CMomRocket::PostDataUpdate(DataUpdateType_t type)
 
     if (type == DATA_UPDATE_CREATED)
     {
-        if (UseTFTrail())
-        {
-            static ConVarRef mom_rj_use_tf_rocketmodel("mom_rj_use_tf_rocketmodel");
-            bool bIsMomModel = !mom_rj_use_tf_rocketmodel.GetBool();
-            // If the Momentum rocket model is used, the attachment point for particle systems is called "0" instead of "trail"
-            const char *pAttachmentName = bIsMomModel ? "0" : "trail";
-
-            if (enginetrace->GetPointContents(GetAbsOrigin()) & MASK_WATER)
-            {
-                ParticleProp()->Create("rockettrail_underwater", PATTACH_POINT_FOLLOW, pAttachmentName);
-            }
-            else
-            {
-                ParticleProp()->Create("rockettrail", PATTACH_POINT_FOLLOW, pAttachmentName);
-            }
-        }
-
-        // Now stick our initial velocity into the interpolation history
         CInterpolatedVar<Vector> &interpolator = GetOriginInterpolator();
         interpolator.ClearHistory();
 
@@ -136,10 +133,35 @@ void CMomRocket::PostDataUpdate(DataUpdateType_t type)
     }
 }
 
+void C_MomRocket::OnDataChanged(DataUpdateType_t updateType)
+{
+    BaseClass::OnDataChanged(updateType);
+
+    if (updateType == DATA_UPDATE_CREATED)
+    {
+        if (mom_rj_trail.GetInt() == 0)
+            return;
+
+        static ConVarRef mom_rj_use_tf_rocketmodel("mom_rj_use_tf_rocketmodel");
+        const bool bIsMomModel = !mom_rj_use_tf_rocketmodel.GetBool();
+        const bool bIsTF2Trail = mom_rj_trail.GetInt() == 2;
+        const char *pAttachmentName = bIsMomModel ? "0" : "trail";
+
+        const auto pWepScript = g_pWeaponDef->GetWeaponScript(WEAPON_ROCKETLAUNCHER);
+
+        const char *pParticle = pWepScript->pKVWeaponParticles->GetString(bIsTF2Trail ? "RocketTrail_TF2" : "RocketTrail");
+
+        // MOM_TODO REMOVEME
+        if (mom_rj_trail.GetInt() == 3)
+            pParticle = MOM_TRAIL_PARTICLE_B;
+
+        ParticleProp()->Create(pParticle, PATTACH_POINT_FOLLOW, pAttachmentName);
+    }
+}
+
 int CMomRocket::DrawModel(int flags)
 {
-    // Don't draw rocket during the first 0.2 seconds.
-    if (gpGlobals->curtime - m_flSpawnTime < 0.2f)
+    if (gpGlobals->curtime - m_flSpawnTime < mom_rj_rocket_drawdelay.GetFloat())
     {
         return 0;
     }
@@ -147,46 +169,16 @@ int CMomRocket::DrawModel(int flags)
     return BaseClass::DrawModel(flags);
 }
 
-void CMomRocket::Spawn()
-{
-    m_flSpawnTime = gpGlobals->curtime;
-    BaseClass::Spawn();
-}
-
 #else
 
-void CMomRocket::Spawn()
-{
-    BaseClass::Spawn();
-
-    UseClientSideAnimation();
-    SetCollisionGroup(COLLISION_GROUP_PROJECTILE);
-    SetSolidFlags(FSOLID_NOT_STANDABLE);
-    SetMoveType(MOVETYPE_FLY, MOVECOLLIDE_FLY_CUSTOM);
-    SetSolid(SOLID_BBOX);
-    AddEFlags(EFL_NO_WATER_VELOCITY_CHANGE);
-    AddEffects(EF_NOSHADOW);
-    SetSize(Vector(0, 0, 0), Vector(0, 0, 0));
-    AddFlag(FL_GRENADE);
-
-    m_takedamage = DAMAGE_NO;
-    SetGravity(0.0f);
-
-    SetTouch(&CMomRocket::RocketTouch);
-    SetNextThink(gpGlobals->curtime);
-}
-
-void CMomRocket::Precache()
-{
-    BaseClass::Precache();
-    PrecacheModel(MOM_ROCKET_MODEL);
-    PrecacheModel(TF_ROCKET_MODEL);
-    PrecacheScriptSound("Missile.Ignite");
-    PrecacheScriptSound("BaseExplosionEffect.Sound");
-    PrecacheScriptSound("BaseExplosionEffect.SoundTF2");
-}
-
 void CMomRocket::SetupInitialTransmittedGrenadeVelocity(const Vector &velocity) { m_vInitialVelocity = velocity; }
+
+void CMomRocket::StopTrailSound()
+{
+    const auto pWepInfo = g_pWeaponDef->GetWeaponScript(WEAPON_ROCKETLAUNCHER);
+
+    StopSound(pWepInfo->pKVWeaponSounds->GetString("RocketTrail"));
+}
 
 void CMomRocket::Destroy(bool bNoGrenadeZone)
 {
@@ -194,8 +186,7 @@ void CMomRocket::Destroy(bool bNoGrenadeZone)
     SetNextThink(gpGlobals->curtime);
     SetTouch(NULL);
     AddEffects(EF_NODRAW);
-    StopSound("Missile.Ignite");
-    DestroyTrail();
+    StopTrailSound();
 
     if (bNoGrenadeZone)
     {
@@ -206,56 +197,6 @@ void CMomRocket::Destroy(bool bNoGrenadeZone)
             pGlowSprite->SetThink(&CSprite::SUB_Remove);
             pGlowSprite->SetNextThink(gpGlobals->curtime + 1.0);
         }
-    }
-}
-
-void CMomRocket::DestroyTrail()
-{
-    if (UseTFTrail())
-        return;
-
-    if (m_hRocketTrail)
-    {
-        m_hRocketTrail->SetLifetime(0.1f);
-        m_hRocketTrail->SetParent(nullptr);
-        m_hRocketTrail = nullptr;
-    }
-}
-
-void CMomRocket::CreateRocketExplosionEffect(trace_t *pTrace, CBaseEntity *pOther)
-{
-    static ConVarRef mom_rj_sounds("mom_rj_sounds");
-    int iEntIndex = pOther->entindex();
-    CWeaponID m_hWeaponID = WEAPON_ROCKETLAUNCHER;
-    Vector vecOrigin = GetAbsOrigin();
-    CBaseEntity *pOwner = GetOwnerEntity();
-    float flDamage = GetDamage();
-    float flRadius = GetRadius();
-    CPVSFilter filter(vecOrigin);
-
-    switch (mom_rj_particles.GetInt())
-    {
-    case 1:
-        if (mom_rj_sounds.GetInt() == 0)
-        {
-            // Silent explosion
-            ExplosionCreate(vecOrigin, GetAbsAngles(), pOwner, flDamage, flRadius, false, 0.0f, false, true);
-        }
-        else if (mom_rj_sounds.GetInt() == 1)
-        {
-            ExplosionCreate(vecOrigin, GetAbsAngles(), pOwner, flDamage, flRadius, false);
-        }
-        else if (mom_rj_sounds.GetInt() == 2)
-        {
-            // Small hack: If TF2 sounds are selected but Momentum particles, then use silent standard explosion effect and play TF2 explosion sound
-            ExplosionCreate(vecOrigin, GetAbsAngles(), pOwner, flDamage, flRadius, false, 0.0f, false, true);
-            CBaseEntity::EmitSound(filter, SOUND_FROM_WORLD, "BaseExplosionEffect.SoundTF2", &vecOrigin);
-        }
-        break;
-    case 0:
-    case 2:
-        TE_TFExplosion(filter, 0.0f, vecOrigin, pTrace->plane.normal, m_hWeaponID, iEntIndex);
-        break;
     }
 }
 
@@ -278,31 +219,23 @@ void CMomRocket::Explode(trace_t *pTrace, CBaseEntity *pOther)
         SetAbsOrigin(pTrace->endpos + (pTrace->plane.normal * 1.0f));
     }
 
-    Vector vecOrigin = GetAbsOrigin();
-    CBaseEntity *pOwner = GetOwnerEntity();
+    const auto vecOrigin = GetAbsOrigin();
 
-    float flDamage = GetDamage();
-    float flRadius = GetRadius();
-
-    // Create explosion effect with no damage depending on the particle cvar setting, see method declaration
-    CreateRocketExplosionEffect(pTrace, pOther);
+    // Effect
+    CPVSFilter filter(vecOrigin);
+    TE_TFExplosion(filter, vecOrigin, pTrace->plane.normal, WEAPON_ROCKETLAUNCHER);
 
     // Damage
-    CTakeDamageInfo info(this, pOwner, vec3_origin, vecOrigin, flDamage, GetDamageType());
-    RadiusDamage(info, vecOrigin, flRadius, CLASS_NONE, nullptr);
+    const CTakeDamageInfo info(this, GetOwnerEntity(), vec3_origin, vecOrigin, GetDamage(), GetDamageType());
+    RadiusDamage(info, vecOrigin, GetRadius(), CLASS_NONE, nullptr);
 
-    DestroyTrail();
+    StopTrailSound();
 
-    m_hOwner = nullptr;
-
-    StopSound("Missile.Ignite");
-
-    if (!pOther->IsPlayer())
+    if (mom_rj_decals_enable.GetBool() && pOther && !pOther->IsPlayer())
     {
-        UTIL_DecalTrace(pTrace, "Scorch");
+        UTIL_DecalTrace(pTrace, "RocketScorch");
     }
 
-    // Remove the rocket
     UTIL_Remove(this);
 }
 
@@ -318,10 +251,8 @@ void CMomRocket::RocketTouch(CBaseEntity *pOther)
     const trace_t *pTrace = &GetTouchTrace();
     if (pTrace->surface.flags & SURF_SKY)
     {
-        DestroyTrail();
+        StopTrailSound();
 
-        m_hOwner = nullptr;
-        StopSound("Missile.Ignite");
         UTIL_Remove(this);
         return;
     }
@@ -332,42 +263,11 @@ void CMomRocket::RocketTouch(CBaseEntity *pOther)
     Explode(&trace, pOther);
 }
 
-void CMomRocket::CreateSmokeTrail()
-{
-    if (m_hRocketTrail)
-        return;
-
-    // Smoke trail.
-    if ((m_hRocketTrail = RocketTrail::CreateRocketTrail()) != NULL)
-    {
-        m_hRocketTrail->m_Opacity = 0.2f;
-        m_hRocketTrail->m_SpawnRate = 100;
-        m_hRocketTrail->m_ParticleLifetime = 0.5f;
-        m_hRocketTrail->m_StartColor.Init(0.65f, 0.65f, 0.65f);
-        m_hRocketTrail->m_EndColor.Init(0.0, 0.0, 0.0);
-        m_hRocketTrail->m_StartSize = 8;
-        m_hRocketTrail->m_EndSize = 32;
-        m_hRocketTrail->m_SpawnRadius = 4;
-        m_hRocketTrail->m_MinSpeed = 2;
-        m_hRocketTrail->m_MaxSpeed = 16;
-
-        m_hRocketTrail->SetLifetime(999);
-        m_hRocketTrail->FollowEntity(this, "0");
-    }
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Spawn a new rocket
-//
-// Input  : &vecOrigin -
-//          &vecAngles -
-//          *pentOwner -
-//
-// Output : CMomRocket
-//-----------------------------------------------------------------------------
 CMomRocket *CMomRocket::EmitRocket(const Vector &vecOrigin, const QAngle &vecAngles, CBaseEntity *pOwner)
 {
-    CMomRocket *pRocket = static_cast<CMomRocket *>(CreateNoSpawn("momentum_rocket", vecOrigin, vecAngles, pOwner));
+    const auto pRocket = dynamic_cast<CMomRocket *>(CreateNoSpawn("momentum_rocket", vecOrigin, vecAngles, pOwner));
+    if (!pRocket)
+        return nullptr;
 
     if (!mom_rj_use_tf_rocketmodel.GetBool())
     {
@@ -405,18 +305,10 @@ CMomRocket *CMomRocket::EmitRocket(const Vector &vecOrigin, const QAngle &vecAng
     // NOTE: Rocket explosion radius is 146.0f in TF2, but 121.0f is used for self damage (see RadiusDamage in mom_gamerules)
     pRocket->SetRadius(146.0f);
 
-    // Momentum trail
-    if (mom_rj_trail.GetInt() == 1)
+    if (mom_rj_trail_sound_enable.GetBool())
     {
-        pRocket->CreateSmokeTrail();
-    }
-
-    static ConVarRef mom_rj_sounds("mom_rj_sounds");
-    const bool bMomSounds = !mom_rj_use_tf_rocketmodel.GetBool() && mom_rj_sounds.GetInt() == 1;
-    const bool bTF2Sounds = !mom_rj_use_tf_rocketmodel.GetBool() && mom_rj_sounds.GetInt() == 2;
-    if (bMomSounds || bTF2Sounds)
-    {
-        pRocket->EmitSound("Missile.Ignite");
+        const auto pWepInfo = g_pWeaponDef->GetWeaponScript(WEAPON_ROCKETLAUNCHER);
+        pRocket->EmitSound(pWepInfo->pKVWeaponSounds->GetString("RocketTrail"));
     }
 
     return pRocket;

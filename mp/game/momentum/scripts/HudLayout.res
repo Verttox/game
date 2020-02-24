@@ -388,5 +388,32 @@
         "enabled"       "1"
         "bgcolor_override"  "0 0 0 0"
         "PaintBackgroundType"   "0" // rounded corners
-    }   
+    }
+    
+    HudStickyCharge
+    {
+        "fieldName"		"HudStickyCharge"
+        "visible"		"1"
+        "enabled"		"1"
+        "xpos"          "c-75"
+        "ypos"          "c-20"
+        "zpos"			"1"
+        "wide"			"150"
+        "tall"          "100"
+        "paintbackground" "0"
+        "bgcolor_override" "0 0 0 0"
+    }
+
+    CHudStickybombs
+    {
+        "fieldName"		"CHudStickybombs"
+        "visible"		"1"
+        "enabled"		"1"
+        "xpos"          "c-75"
+        "ypos"          "c35"
+        "wide"			"150"
+        "tall"			"50"
+        "fgcolor_override"		"0 0 0 0"
+        "bgcolor_override"		"0 0 0 0"
+    }
 }

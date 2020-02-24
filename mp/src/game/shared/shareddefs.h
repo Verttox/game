@@ -99,14 +99,9 @@ public:
 #define VEC_DEAD_VIEWHEIGHT_SCALED( player )	( g_pGameRules->GetViewVectors()->m_vDeadViewHeight * player->GetModelScale() )
 
 #define WATERJUMP_HEIGHT			8
-#define WATERJUMP_FORWARD			( g_pGameModeSystem->GameModeIs(GAMEMODE_RJ) ? 30.0f : 24.0f )
-#define WATERJUMP_UP				( g_pGameModeSystem->GameModeIs(GAMEMODE_RJ) ? 300.0f : 256.0f )
-#define WATERWAIST_OFFSET			( g_pGameModeSystem->GameModeIs(GAMEMODE_RJ) ? 12.0f : 0.0f )
 
 #define MAX_CLIMB_SPEED		200
 
-#define TIME_TO_DUCK        ( g_pGameModeSystem->GameModeIs(GAMEMODE_RJ) ? 0.2 : 0.4 )
-#define TIME_TO_DUCK_MS     ( g_pGameModeSystem->GameModeIs(GAMEMODE_RJ) ? 200.0f : 400.0f )
 #define TIME_TO_UNDUCK		0.2
 #define TIME_TO_UNDUCK_MS	200.0f
 
@@ -116,7 +111,6 @@ public:
 #define MAX_WEAPON_SLOTS		6	// hud item selection slots
 #define MAX_WEAPON_POSITIONS	20	// max number of items within a slot
 #define MAX_ITEM_TYPES			6	// hud item selection slots
-#define MAX_WEAPONS				48	// Max number of weapons available
 
 #define MAX_ITEMS				5	// hard coded item types
 

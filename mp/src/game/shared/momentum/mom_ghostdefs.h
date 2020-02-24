@@ -5,21 +5,12 @@
 
 enum PacketType
 {
-    PT_CONN_REQ = 0,
-    PT_CONN_ACK,
-    PT_APPR_DATA,
-    PT_APPR_ACK,
-    PT_POS_DATA,
-    PT_POS_ACK,
-    PT_CHAT_DATA,
-    PT_MAP_CHANGE,
-    PT_DISC_REQ,
+    PACKET_TYPE_POSITION = 0,
+    PACKET_TYPE_DECAL,
+    PACKET_TYPE_SPEC_UPDATE,
+    PACKET_TYPE_SAVELOC_REQ,
 
-    PT_DECAL_DATA,
-    PT_SPEC_UPDATE,
-    PT_SAVELOC_REQ,
-
-    PT_COUNT
+    PACKET_TYPE_COUNT
 };
 
 #define APPEARANCE_BODYGROUP_MIN 0
@@ -87,12 +78,13 @@ class MomentumPacket
 // Based on CReplayFrame, describes data needed for ghost's physical properties 
 class PositionPacket : public MomentumPacket
 {
-  public:
+public:
     int Buttons;
     float ViewOffset;
     QAngle EyeAngle;
     Vector Position;
     Vector Velocity;
+
     PositionPacket(const QAngle eyeAngle, const Vector position, const Vector velocity, const float viewOffsetZ, const int buttons)
     {
         EyeAngle = eyeAngle;
@@ -101,11 +93,17 @@ class PositionPacket : public MomentumPacket
 
         Buttons = buttons;
         ViewOffset = viewOffsetZ;
+
+        Validate();
     }
 
     PositionPacket(): Buttons(0), ViewOffset(0)
     {
+        EyeAngle.Init();
+        Position.Init();
+        Velocity.Init();
     }
+
     PositionPacket(CUtlBuffer &buf)
     {
         buf.Get(&EyeAngle, sizeof(QAngle));
@@ -113,9 +111,11 @@ class PositionPacket : public MomentumPacket
         buf.Get(&Velocity, sizeof(Vector));
         Buttons = buf.GetInt();
         ViewOffset = buf.GetFloat();
+
+        Validate();
     }
 
-    PacketType GetType() const OVERRIDE { return PT_POS_DATA; }
+    PacketType GetType() const OVERRIDE { return PACKET_TYPE_POSITION; }
 
     void Write(CUtlBuffer& buf) OVERRIDE
     {
@@ -127,6 +127,20 @@ class PositionPacket : public MomentumPacket
         buf.PutFloat(ViewOffset);
     }
 
+    void Validate()
+    {
+        if (!EyeAngle.IsValid() || !IsEntityQAngleReasonable(EyeAngle))
+            EyeAngle = vec3_angle;
+
+        if (!Position.IsValid() || !IsEntityPositionReasonable(Position))
+            Position = vec3_origin;
+
+        if (!Velocity.IsValid() || !IsEntityVelocityReasonable(Velocity))
+            Velocity = vec3_origin;
+
+        ViewOffset = Clamp(ViewOffset, VEC_DUCK_VIEW.z, VEC_VIEW.z);
+    }
+
     PositionPacket& operator=(const PositionPacket &other)
     {
         Buttons = other.Buttons;
@@ -134,6 +148,7 @@ class PositionPacket : public MomentumPacket
         EyeAngle = other.EyeAngle;
         Position = other.Position;
         Velocity = other.Velocity;
+        Validate();
         return *this;
     }
 
@@ -178,10 +193,15 @@ class SpecUpdatePacket : public MomentumPacket
     SpecUpdatePacket(CUtlBuffer &buf)
     {
         specTarget = static_cast<uint64>(buf.GetInt64());
-        spec_type = static_cast<SpectateMessageType_t>(buf.GetInt());
+
+        auto iSpecType = buf.GetInt();
+        if (iSpecType < SPEC_UPDATE_FIRST || iSpecType > SPEC_UPDATE_LAST)
+            iSpecType = SPEC_UPDATE_INVALID;
+
+        spec_type = static_cast<SpectateMessageType_t>(iSpecType);
     }
 
-    PacketType GetType() const OVERRIDE { return PT_SPEC_UPDATE; }
+    PacketType GetType() const OVERRIDE { return PACKET_TYPE_SPEC_UPDATE; }
 
     void Write(CUtlBuffer& buf) OVERRIDE
     {
@@ -197,7 +217,10 @@ enum DecalType
     DECAL_PAINT,
     DECAL_KNIFE,
     DECAL_ROCKET,
-    // etc
+
+    DECAL_FIRST = DECAL_BULLET,
+    DECAL_LAST = DECAL_ROCKET,
+    DECAL_INVALID = -1
 };
 
 struct BulletDecalData
@@ -227,6 +250,7 @@ class DecalPacket : public MomentumPacket
         decal_type = decalType;
         vOrigin = origin;
         vAngle = angle;
+        Validate();
     }
   public:
     Vector vOrigin;
@@ -244,7 +268,7 @@ class DecalPacket : public MomentumPacket
     };
     DecalData data;
 
-    DecalPacket() {}
+    DecalPacket() : decal_type(DECAL_INVALID) {}
 
     static DecalPacket Bullet(Vector origin, QAngle angle, int iAmmoType, int iMode, int iSeed, float fSpread)
     {
@@ -279,10 +303,15 @@ class DecalPacket : public MomentumPacket
 
     DecalPacket(CUtlBuffer &buf)
     {
-        decal_type = static_cast<DecalType>(buf.GetUnsignedChar());
+        int iDecalType = buf.GetUnsignedChar();
+        if (iDecalType < DECAL_FIRST || iDecalType > DECAL_LAST)
+            iDecalType = DECAL_INVALID;
+
+        decal_type = static_cast<DecalType>(iDecalType);
         buf.Get(&vOrigin, sizeof(Vector));
         buf.Get(&vAngle, sizeof(QAngle));
         buf.Get(&data, sizeof(data));
+        Validate();
     }
 
     DecalPacket& operator=(const DecalPacket &other)
@@ -291,10 +320,11 @@ class DecalPacket : public MomentumPacket
         vOrigin = other.vOrigin;
         vAngle = other.vAngle;
         memcpy(&data, &other.data, sizeof(data));
+        Validate();
         return *this;
     }
 
-    PacketType GetType() const OVERRIDE { return PT_DECAL_DATA; }
+    PacketType GetType() const OVERRIDE { return PACKET_TYPE_DECAL; }
 
     void Write(CUtlBuffer& buf) OVERRIDE
     {
@@ -304,6 +334,39 @@ class DecalPacket : public MomentumPacket
         buf.Put(&vAngle, sizeof(QAngle));
         buf.Put(&data, sizeof(data));
     }
+
+    void Validate()
+    {
+        if (!vOrigin.IsValid() || !IsEntityPositionReasonable(vOrigin))
+            vOrigin = vec3_origin;
+
+        // vAngle is not always angle data (for grenade it's vecThrow)
+        if (!vAngle.IsValid())
+            vAngle = vec3_angle;
+
+        if (decal_type == DECAL_PAINT)
+        {
+            data.paint.fDecalRadius = clamp(data.paint.fDecalRadius, 0.001f, 1.0f);
+        }
+    }
+};
+
+enum SavelocRequestStage
+{
+    SAVELOC_REQ_STAGE_INVALID = -1,
+    SAVELOC_REQ_STAGE_DONE,         // Done
+    SAVELOC_REQ_STAGE_COUNT_REQ,    // Asking how many savelocs there are
+    SAVELOC_REQ_STAGE_COUNT_ACK,    // Telling how many savelocs there are
+    SAVELOC_REQ_STAGE_SAVELOC_REQ,  // Requesting specific savelocs at specific indexes
+    SAVELOC_REQ_STAGE_SAVELOC_ACK,  // Giving the specific savelocs
+
+    // Internal
+    SAVELOC_REQ_STAGE_REQUESTER_LEFT,
+    SAVELOC_REQ_STAGE_CLICKED_CANCEL,
+
+    // Bounds for online
+    SAVELOC_REQ_STAGE_FIRST = SAVELOC_REQ_STAGE_DONE,
+    SAVELOC_REQ_STAGE_LAST = SAVELOC_REQ_STAGE_SAVELOC_ACK
 };
 
 class SavelocReqPacket : public MomentumPacket
@@ -312,12 +375,12 @@ class SavelocReqPacket : public MomentumPacket
     // Stage type
     int stage;
 
-    // Stage == 2 ? (The number of savelocs we have to offer)
-    // Stage == (3 || 4) ? (The number of savelocs we have chosen to download)
+    // Stage == _COUNT_ACK ? (The number of savelocs we have to offer)
+    // Stage == (_SAVELOC_REQ || _SAVELOC_ACK) ? (The number of savelocs we have chosen to download)
     int saveloc_count;
 
-    // Stage == 3 ? (The selected nums of savelocs to download)
-    // Stage == 4 ? (The actual saveloc data, in binary)
+    // Stage == _SAVELOC_REQ ? (The selected nums of savelocs to download)
+    // Stage == _SAVELOC_ACK ? (The actual saveloc data, in binary)
     CUtlBuffer dataBuf;
 
     SavelocReqPacket(): stage(0), saveloc_count(0)
@@ -328,29 +391,34 @@ class SavelocReqPacket : public MomentumPacket
     SavelocReqPacket(CUtlBuffer &buf)
     {
         stage = buf.GetInt();
-        if (stage > 1)
+
+        if (stage < SAVELOC_REQ_STAGE_FIRST || stage > SAVELOC_REQ_STAGE_LAST)
+            stage = SAVELOC_REQ_STAGE_INVALID;
+
+        if (stage > SAVELOC_REQ_STAGE_COUNT_REQ)
         {
             saveloc_count = buf.GetInt();
 
-            if (stage > 2)
+            if (stage > SAVELOC_REQ_STAGE_COUNT_ACK && buf.IsValid())
             {
                 dataBuf.Clear();
+                dataBuf.SetBigEndian(false);
                 dataBuf.Put(buf.PeekGet(), buf.GetBytesRemaining());
             }
         }
     }
 
-    PacketType GetType() const OVERRIDE { return PT_SAVELOC_REQ; }
+    PacketType GetType() const OVERRIDE { return PACKET_TYPE_SAVELOC_REQ; }
 
     void Write(CUtlBuffer& buf) OVERRIDE
     {
         MomentumPacket::Write(buf);
         buf.PutInt(stage);
-        if (stage > 1)
+        if (stage > SAVELOC_REQ_STAGE_COUNT_REQ)
         {
             buf.PutInt(saveloc_count);
 
-            if (stage > 2)
+            if (stage > SAVELOC_REQ_STAGE_COUNT_ACK)
                 buf.Put(dataBuf.Base(), dataBuf.TellPut());
         }
     }

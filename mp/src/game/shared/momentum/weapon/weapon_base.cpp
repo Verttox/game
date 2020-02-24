@@ -27,60 +27,7 @@ extern IVModelInfo* modelinfo;
 
 #endif
 
-
-// ----------------------------------------------------------------------------- //
-// Global functions.
-// ----------------------------------------------------------------------------- //
-
-//--------------------------------------------------------------------------------------------------------
-static const char * s_WeaponAliasInfo[] =
-{
-    "none",		// WEAPON_NONE
-    "momentum_pistol",	// WEAPON_PISTOL
-    "momentum_rifle", //WEAPON_RIFLE
-    "momentum_shotgun", //WEAPON_SHOTGUN
-    "momentum_smg", //WEAPON_SMG
-    "momentum_sniper", //WEAPON_SNIPER
-    "momentum_lmg", //WEAPON_LMG
-    "momentum_grenade", //WEAPON_GRENADE
-    "knife",	// WEAPON_KNIFE
-    "momentum_paintgun", // WEAPON_PAINTGUN
-    "momentum_rocketlauncher", // WEAPON_ROCKETLAUNCHER
-    nullptr,		// WEAPON_NONE
-};
-
-//--------------------------------------------------------------------------------------------------------
-//
-// Given an alias, return the associated weapon ID
-//
-int AliasToWeaponID(const char *alias)
-{
-    if (alias)
-    {
-        for (int i = 0; s_WeaponAliasInfo[i] != nullptr; ++i)
-            if (!Q_stricmp(s_WeaponAliasInfo[i], alias))
-                return i;
-    }
-
-    return WEAPON_NONE;
-}
-
-//--------------------------------------------------------------------------------------------------------
-//
-// Given a weapon ID, return its alias
-//
-const char *WeaponIDToAlias(int id)
-{
-    if (id >= WEAPON_MAX || id < 0)
-        return nullptr;
-
-    return s_WeaponAliasInfo[id];
-}
-
-
-// ----------------------------------------------------------------------------- //
-// CWeaponBase tables.
-// ----------------------------------------------------------------------------- //
+#include "tier0/memdbgon.h"
 
 IMPLEMENT_NETWORKCLASS_ALIASED(WeaponBase, DT_WeaponBase)
 
@@ -165,12 +112,6 @@ bool CWeaponBase::KeyValue(const char *szKeyName, const char *szValue)
 
 bool CWeaponBase::PlayEmptySound()
 {
-    //MIKETODO: certain weapons should override this to make it empty:
-    //	C4
-    //	Flashbang
-    //	HE Grenade
-    //	Smoke grenade				
-
     CPASAttenuationFilter filter(this);
     filter.UsePredictionRules();
 
@@ -210,26 +151,35 @@ void CWeaponBase::ItemPostFrame()
         m_bInReload = false;
     }
 
-    if (pPlayer->m_nButtons & IN_ATTACK2 && m_flNextSecondaryAttack <= gpGlobals->curtime)
+    bool bSecondaryAttack = (pPlayer->m_nButtons & IN_ATTACK2) && (m_flNextSecondaryAttack <= gpGlobals->curtime);
+    bool bPrimaryAttack = (pPlayer->m_nButtons & IN_ATTACK) && (m_flNextPrimaryAttack <= gpGlobals->curtime) &&
+                          (DualFire() || !bSecondaryAttack);
+
+    if (bPrimaryAttack || bSecondaryAttack)
     {
-        if (m_iClip2 != -1 && !pPlayer->GetAmmoCount(GetSecondaryAmmoType()))
+        if (bSecondaryAttack)
         {
-            m_bFireOnEmpty = true;
+            if (m_iClip2 != -1 && !pPlayer->GetAmmoCount(GetSecondaryAmmoType()))
+            {
+                m_bFireOnEmpty = true;
+            }
+
+            SecondaryAttack();
+
+            pPlayer->m_nButtons &= ~IN_ATTACK2;
         }
 
-        SecondaryAttack();
-
-        pPlayer->m_nButtons &= ~IN_ATTACK2;
-    }
-    else if (pPlayer->m_nButtons & IN_ATTACK && m_flNextPrimaryAttack <= gpGlobals->curtime)
-    {
-        if (m_iClip1 == 0/* && pszAmmo1()*/ || GetMaxClip1() == -1 && !pPlayer->GetAmmoCount(GetPrimaryAmmoType()))
+        if (bPrimaryAttack)
         {
-            m_bFireOnEmpty = true;
-        }
+            if ((m_iClip1 == 0 /* && pszAmmo1()*/) ||
+                (GetMaxClip1() == -1 && !pPlayer->GetAmmoCount(GetPrimaryAmmoType())))
+            {
+                m_bFireOnEmpty = true;
+            }
 
-        PrimaryAttack();
-        //---
+            PrimaryAttack();
+            //---
+        }
     }
     else if (pPlayer->m_nButtons & IN_RELOAD && GetMaxClip1() != WEAPON_NOCLIP && !m_bInReload && m_flNextPrimaryAttack < gpGlobals->curtime)
     {
@@ -279,7 +229,7 @@ void CWeaponBase::ItemPostFrame()
         else
         {
             // weapon is useable. Reload if empty and weapon has waited as long as it has to after firing
-            if (m_iClip1 == 0 && !(GetWeaponFlags() & ITEM_FLAG_NOAUTORELOAD) && m_flNextPrimaryAttack < gpGlobals->curtime)
+            if (m_iClip1 == 0 && m_flNextPrimaryAttack < gpGlobals->curtime)
             {
                 Reload();
                 return;
@@ -296,93 +246,12 @@ float CWeaponBase::GetMaxSpeed() const
     return sv_maxspeed.GetFloat();
 }
 
-
-const CWeaponInfo &CWeaponBase::GetMomWpnData() const
+void CWeaponBase::Precache()
 {
-    const FileWeaponInfo_t *pWeaponInfo = &GetWpnData();
-    const CWeaponInfo *pInfo;
+    BaseClass::Precache();
 
-#ifdef _DEBUG
-    pInfo = dynamic_cast< const CWeaponInfo* >( pWeaponInfo );
-    Assert( pInfo );
-#else
-    pInfo = static_cast<const CWeaponInfo*>(pWeaponInfo);
-#endif
-
-    return *pInfo;
-}
-
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-const char *CWeaponBase::GetViewModel(int /*viewmodelindex = 0 -- this is ignored in the base class here*/) const
-{
-    CMomentumPlayer *pOwner = GetPlayerOwner();
-
-    if (pOwner == nullptr)
-    {
-        return BaseClass::GetViewModel();
-    }
-
-    return GetWpnData().szViewModel;
-}
-
-// Overridden for the CS gun overrides, since GetClassname returns the weapon_glock etc, instead
-// of the weapon_momentum_* class. So we do a little workaround with the weapon ID.
-void CWeaponBase::Precache(void)
-{
     PrecacheScriptSound("Default.ClipEmpty_Pistol");
     PrecacheScriptSound("Default.ClipEmpty_Rifle");
-    PrecacheScriptSound("Default.Zoom");
-
-    const char *pWeaponAlias = WeaponIDToAlias(GetWeaponID());
-
-    if (pWeaponAlias)
-    {
-        char wpnName[128];
-        Q_snprintf(wpnName, sizeof(wpnName), "weapon_%s", pWeaponAlias);
-        
-        // Add this weapon to the weapon registry, and get our index into it
-        // Get weapon data from script file
-        if (ReadWeaponDataFromFileForSlot(filesystem, wpnName, &m_hWeaponFileInfo, GetEncryptionKey()))
-        {
-#if defined(CLIENT_DLL)
-            gWR.LoadWeaponSprites(GetWeaponFileInfoHandle());
-#endif
-            // Precache models (preload to avoid hitch)
-            m_iViewModelIndex = 0;
-            m_iWorldModelIndex = 0;
-            if (GetViewModel() && GetViewModel()[0])
-            {
-                m_iViewModelIndex = PrecacheModel(GetViewModel());
-            }
-            if (GetWorldModel() && GetWorldModel()[0])
-            {
-                m_iWorldModelIndex = PrecacheModel(GetWorldModel());
-            }
-
-            // Precache sounds, too
-            for (int i = 0; i < NUM_SHOOT_SOUND_TYPES; ++i)
-            {
-                const char *shootsound = GetShootSound(i);
-                if (shootsound && shootsound[0])
-                {
-                    PrecacheScriptSound(shootsound);
-                }
-            }
-        }
-        else
-        {
-            // Couldn't read data file, remove myself
-            Warning("Error reading weapon data file for: %s\n", GetClassname());
-            //	Remove( );	//don't remove, this gets released soon!
-        }
-    }
-    else
-    {
-        Warning("Error reading weapon data file for weapon alias: %i \n", GetWeaponID());
-    }
 }
 
 Activity CWeaponBase::GetDeployActivity(void)
@@ -404,9 +273,10 @@ bool CWeaponBase::DefaultDeploy(char *szViewModel, char *szWeaponModel, int iAct
     SetViewModel();
     SendWeaponAnim(GetDeployActivity());
 
+    // Can't shoot again until we've finished deploying, but don't squash current delay as well
     pOwner->SetNextAttack(gpGlobals->curtime + DeployTime());
-    m_flNextPrimaryAttack = gpGlobals->curtime + DeployTime();
-    m_flNextSecondaryAttack = gpGlobals->curtime + DeployTime();
+    m_flNextPrimaryAttack = Max<float>(m_flNextPrimaryAttack, gpGlobals->curtime + DeployTime());
+    m_flNextSecondaryAttack = Max<float>(m_flNextSecondaryAttack, gpGlobals->curtime + DeployTime());
 
     SetWeaponVisible(true);
     SetWeaponModelIndex(szWeaponModel);
@@ -781,7 +651,7 @@ bool CWeaponBase::DefaultPistolReload()
     if (pPlayer->GetAmmoCount(GetPrimaryAmmoType()) <= 0)
         return true;
 
-    if (!DefaultReload(GetMomWpnData().iDefaultClip1, 0, ACT_VM_RELOAD))
+    if (!DefaultReload(GetDefaultClip1(), 0, ACT_VM_RELOAD))
         return false;
 
     pPlayer->m_iShotsFired = 0;

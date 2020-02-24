@@ -298,8 +298,6 @@ BEGIN_DATADESC( CBasePlayer )
 	// DEFINE_FIELD( m_PlayerInfo, CPlayerInfo ),
 
 	DEFINE_FIELD( m_flSwimTime, FIELD_TIME ),
-	DEFINE_FIELD( m_flDuckTime, FIELD_TIME ),
-	DEFINE_FIELD( m_flDuckJumpTime, FIELD_TIME ),
 
 	DEFINE_FIELD( m_flSuitUpdate, FIELD_TIME ),
 	DEFINE_AUTO_ARRAY( m_rgSuitPlayList, FIELD_INTEGER ),
@@ -7170,19 +7168,17 @@ void CBasePlayer::Weapon_Drop( CBaseCombatWeapon *pWeapon, const Vector *pvecTar
 //-----------------------------------------------------------------------------
 void CBasePlayer::Weapon_DropSlot( int weaponSlot )
 {
-	CBaseCombatWeapon *pWeapon;
-
-	// Check for that slot being occupied already
-	for ( int i=0; i < MAX_WEAPONS; i++ )
+    // Check for that slot being occupied already
+	for ( int i=0; i < WEAPON_MAX; i++ )
 	{
-		pWeapon = GetWeapon( i );
+		CBaseCombatWeapon *pWeapon = GetWeapon(i);
 		
-		if ( pWeapon != NULL )
+		if ( pWeapon )
 		{
 			// If the slots match, it's already occupied
 			if ( pWeapon->GetSlot() == weaponSlot )
 			{
-				Weapon_Drop( pWeapon, NULL, NULL );
+				Weapon_Drop( pWeapon, nullptr, nullptr );
 			}
 		}
 	}
@@ -7694,10 +7690,6 @@ void CMovementSpeedMod::InputSpeedMod(inputdata_t &data)
 	if ( data.pActivator && data.pActivator->IsPlayer() )
 	{
 		pPlayer = (CBasePlayer *)data.pActivator;
-	}
-	else if ( !g_pGameRules->IsDeathmatch() )
-	{
-		pPlayer = UTIL_GetLocalPlayer();
 	}
 
 	if ( pPlayer )
@@ -8594,31 +8586,24 @@ bool CBasePlayer::HasAnyAmmoOfType( int nAmmoIndex )
 	if ( GetAmmoCount( nAmmoIndex ) )
 		return true;
 
-	CBaseCombatWeapon *pWeapon;
-
-	// Check all held weapons
-	for ( int i=0; i < MAX_WEAPONS; i++ )
+	CBaseCombatWeapon *pWeapon = m_hMyWeapons[g_pAmmoDef->WeaponID(nAmmoIndex)];
+	if (pWeapon)
 	{
-		pWeapon = GetWeapon( i );
-
-		if ( !pWeapon )
-			continue;
-
 		// We must use clips and use this sort of ammo
-		if ( pWeapon->UsesClipsForAmmo1() && pWeapon->GetPrimaryAmmoType() == nAmmoIndex )
+		if (pWeapon->UsesClipsForAmmo1() && pWeapon->GetPrimaryAmmoType() == nAmmoIndex)
 		{
 			// If we have any ammo, we're done
-			if ( pWeapon->HasPrimaryAmmo() )
+			if (pWeapon->HasPrimaryAmmo())
 				return true;
 		}
-		
+
 		// We'll check both clips for the same ammo type, just in case
-		if ( pWeapon->UsesClipsForAmmo2() && pWeapon->GetSecondaryAmmoType() == nAmmoIndex )
+		if (pWeapon->UsesClipsForAmmo2() && pWeapon->GetSecondaryAmmoType() == nAmmoIndex)
 		{
-			if ( pWeapon->HasSecondaryAmmo() )
+			if (pWeapon->HasSecondaryAmmo())
 				return true;
 		}
-	}	
+	}
 
 	// We're completely without this type of ammo
 	return false;

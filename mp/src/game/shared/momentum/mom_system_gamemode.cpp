@@ -12,26 +12,27 @@
 #include "tier0/memdbgon.h"
 
 #ifdef GAME_DLL
-CON_COMMAND(mom_print_gamemode_vars, "Prints out the currently set values for commands like sv_maxvelocity, airaccel, etc")
+
+CON_COMMAND(mom_print_gamemode_vars, "Prints out the currently set values for commands like sv_maxvelocity, airaccel, etc\n")
 {
     g_pGameModeSystem->PrintGameModeVars();
 }
 
+extern ConVar sv_interval_per_tick;
 static void OnGamemodeChanged(IConVar* var, const char* pOldValue, float fOldValue)
 {
     ConVarRef gm(var);
     const auto gamemode = gm.GetInt();
 
-    TickSet::SetTickrate(gamemode);
-    // set the value of sv_interval_per_tick so it updates when gamemode changes the tickrate.
-    ConVarRef tr("sv_interval_per_tick");
-    tr.SetValue(TickSet::GetTickrate());
-
     g_pGameModeSystem->SetGameMode((GameMode_t)gamemode);
+
+    TickSet::SetTickrate(g_pGameModeSystem->GetGameMode()->GetIntervalPerTick());
+
+    sv_interval_per_tick.SetValue(TickSet::GetTickrate());
 }
 
-static ConVar mom_gamemode("mom_gamemode", "0", FCVAR_REPLICATED | FCVAR_NOT_CONNECTED | FCVAR_HIDDEN | FCVAR_CLIENTCMD_CAN_EXECUTE,
-                       "", true, 0, false, 0, OnGamemodeChanged);
+static MAKE_CONVAR_C(mom_gamemode, "0", FCVAR_REPLICATED | FCVAR_NOT_CONNECTED | FCVAR_HIDDEN | FCVAR_CLIENTCMD_CAN_EXECUTE, "", 0, GAMEMODE_COUNT - 1, OnGamemodeChanged);
+
 #endif
 
 void CGameModeBase::SetGameModeVars()
@@ -56,7 +57,7 @@ void CGameModeBase::OnPlayerSpawn(CMomentumPlayer *pPlayer)
 
 void CGameModeBase::ExecGameModeCfg()
 {
-#ifdef CLIENT_DLL // Without this ifdef, the game fails to build
+#ifdef CLIENT_DLL
     if (GetGameModeCfg())
     {
         engine->ClientCmd_Unrestricted(CFmtStr("exec %s", GetGameModeCfg()));
@@ -96,11 +97,33 @@ void CGameMode_RJ::SetGameModeVars()
     sv_ground_trigger_fix.SetValue(false); // MOM_TODO Remove when bounce triggers have been implemented
 }
 
+void CGameMode_SJ::SetGameModeVars()
+{
+    CGameModeBase::SetGameModeVars();
+
+    // SJ-specific
+    sv_airaccelerate.SetValue(10);
+    sv_accelerate.SetValue(10);
+    sv_maxspeed.SetValue(280);
+    sv_stopspeed.SetValue(100);
+    sv_considered_on_ground.SetValue(2);
+    sv_duck_collision_fix.SetValue(false);
+    sv_ground_trigger_fix.SetValue(false); // MOM_TODO Remove when bounce triggers have been implemented
+}
+
 void CGameMode_RJ::OnPlayerSpawn(CMomentumPlayer *pPlayer)
 {
 #ifdef GAME_DLL
     pPlayer->GiveNamedItem("weapon_momentum_rocketlauncher");
     pPlayer->GiveNamedItem("weapon_momentum_shotgun");
+#endif
+}
+
+void CGameMode_SJ::OnPlayerSpawn(CMomentumPlayer *pPlayer)
+{
+#ifdef GAME_DLL
+    pPlayer->GiveNamedItem("weapon_momentum_stickylauncher");
+    pPlayer->GiveNamedItem("weapon_momentum_pistol");
 #endif
 }
 
@@ -121,6 +144,7 @@ CGameModeSystem::CGameModeSystem() : CAutoGameSystem("CGameModeSystem")
     m_vecGameModes.AddToTail(new CGameMode_Bhop);
     m_vecGameModes.AddToTail(new CGameMode_KZ);
     m_vecGameModes.AddToTail(new CGameMode_RJ);
+    m_vecGameModes.AddToTail(new CGameMode_SJ);
     m_vecGameModes.AddToTail(new CGameMode_Tricksurf);
     m_vecGameModes.AddToTail(new CGameMode_Trikz);
 }
@@ -140,6 +164,17 @@ void CGameModeSystem::LevelInitPostEntity()
 #endif
 }
 
+IGameMode *CGameModeSystem::GetGameMode(int eMode) const
+{
+    if (eMode < GAMEMODE_UNKNOWN || eMode >= GAMEMODE_COUNT)
+    {
+        Warning("Attempted to get invalid game mode %i !\n", eMode);
+        eMode = GAMEMODE_UNKNOWN;
+    }
+
+    return m_vecGameModes[eMode];
+}
+
 void CGameModeSystem::SetGameMode(GameMode_t eMode)
 {
     m_pCurrentGameMode = m_vecGameModes[eMode];
@@ -153,7 +188,7 @@ void CGameModeSystem::SetGameMode(GameMode_t eMode)
 void CGameModeSystem::SetGameModeFromMapName(const char *pMapName)
 {
     // Set to unknown for now
-    m_pCurrentGameMode = m_vecGameModes[0];
+    m_pCurrentGameMode = m_vecGameModes[GAMEMODE_UNKNOWN];
 
     if (pMapName)
     {

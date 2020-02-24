@@ -68,7 +68,7 @@
     "wave" "weapons/rifle/Energy_Rifle_Lower_Bass.wav"
 }
 
-"Weapon_RPG.SingleTF2"
+"Weapon_RL.SingleTF2"
 {
     "channel" "CHAN_WEAPON"
     "volume" "1.0"
@@ -76,6 +76,40 @@
     "pitch" "PITCH_NORM"
     
     "wave" ")weapons/rocket_shoot.wav"
+}
+
+"Weapon_RL.Single"
+{
+    "channel" "CHAN_WEAPON"
+    "volume" "1.0"
+    "soundlevel" "SNDLVL_GUNFIRE"
+    "pitch" "PITCH_NORM"
+    
+    "wave" ")weapons/rl/rocket_shoot.wav"
+}
+
+"Rocket.Trail"
+{
+    "channel"       "CHAN_WEAPON"
+    "volume"        "VOL_NORM"
+    "pitch"         "PITCH_NORM"
+    "soundlevel"    "SNDLVL_90dB"
+
+    "wave"          "weapons/rl/rocket_trail.wav"
+}
+
+"Weapon_RL.Explosion"
+{
+    "channel" "CHAN_WEAPON"
+    "volume" "1.0"
+    "soundlevel" "SNDLVL_95dB"
+    "pitch" "PITCH_NORM"
+
+    "rndwave"
+    {
+        "wave" ")weapons/rl/explode1.wav"
+        "wave" ")weapons/rl/explode2.wav"
+    }
 }
 
 "BaseExplosionEffect.SoundTF2"
@@ -92,3 +126,34 @@
     }
 }
 
+"StickybombLauncher.Single"
+{
+    "channel"	"CHAN_WEAPON"
+    "volume"	"1.0"
+    "soundlevel"	"SNDLVL_94dB"
+    "wave"		"weapons/stickybomblauncher_shoot.wav"
+}
+
+"StickybombLauncher.Detonate"
+{
+    "channel"	"CHAN_WEAPON"
+    "volume"	"1.0"
+    "soundlevel"	"SNDLVL_94dB"
+    "wave"		"weapons/stickybomblauncher_det.wav"
+}
+
+"StickybombLauncher.Deny"
+{
+    "channel"	"CHAN_WEAPON"
+    "volume"	"1.0"
+    "soundlevel"	"SNDLVL_94dB"
+    "wave"		"weapons/stickylauncher/stickybomblauncher_deny.wav"
+}
+
+"StickybombLauncher.Charge"
+{
+    "channel"	"CHAN_WEAPON"
+    "volume"	"1.0"
+    "soundlevel"	"SNDLVL_94dB"
+    "wave"		"weapons/stickybomblauncher_charge_up.wav"
+}

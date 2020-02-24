@@ -61,6 +61,7 @@
 #include "env_debughistory.h"
 #include "tier1/utlstring.h"
 #include "utlhashtable.h"
+#include "damagemodifier.h"
 
 #if defined( TF_DLL )
 #include "tf_gamerules.h"
@@ -1858,7 +1859,7 @@ BEGIN_DATADESC_NO_BASE( CBaseEntity )
 	DEFINE_GLOBAL_KEYFIELD( m_ModelName, FIELD_MODELNAME, "model" ),
 	
 	DEFINE_KEYFIELD( m_vecBaseVelocity, FIELD_VECTOR, "basevelocity" ),
-	DEFINE_FIELD( m_vecAbsVelocity, FIELD_VECTOR ),
+	DEFINE_KEYFIELD( m_vecAbsVelocity, FIELD_VECTOR, "absvelocity" ),
 	DEFINE_KEYFIELD( m_vecAngVelocity, FIELD_VECTOR, "avelocity" ),
 //	DEFINE_FIELD( m_vecAbsAngVelocity, FIELD_VECTOR ),
 	DEFINE_ARRAY( m_rgflCoordinateFrame, FIELD_FLOAT, 12 ), // NOTE: MUST BE IN LOCAL SPACE, NOT POSITION_VECTOR!!! (see CBaseEntity::Restore)
@@ -1934,6 +1935,7 @@ BEGIN_DATADESC_NO_BASE( CBaseEntity )
 
 	// Entity I/O methods to alter context
 	DEFINE_INPUTFUNC( FIELD_STRING, "AddContext", InputAddContext ),
+	DEFINE_INPUTFUNC( FIELD_STRING, "IncrementContext", InputIncrementContext ),
 	DEFINE_INPUTFUNC( FIELD_STRING, "RemoveContext", InputRemoveContext ),
 	DEFINE_INPUTFUNC( FIELD_STRING, "ClearContext", InputClearContext ),
 
@@ -1951,6 +1953,8 @@ BEGIN_DATADESC_NO_BASE( CBaseEntity )
 	DEFINE_OUTPUT( m_OnUser2, "OnUser2" ),
 	DEFINE_OUTPUT( m_OnUser3, "OnUser3" ),
 	DEFINE_OUTPUT( m_OnUser4, "OnUser4" ),
+
+	DEFINE_OUTPUT( m_OnKilled, "OnKilled" ),
 
 	// Function Pointers
 	DEFINE_FUNCTION( SUB_Remove ),
@@ -4133,6 +4137,8 @@ void CBaseEntity::GetInputDispatchEffectPosition( const char *sInputString, Vect
 //-----------------------------------------------------------------------------
 void CBaseEntity::InputKill( inputdata_t &inputdata )
 {
+    m_OnKilled.FireOutput(inputdata.pActivator, this);
+
 	// tell owner ( if any ) that we're dead.This is mostly for NPCMaker functionality.
 	CBaseEntity *pOwner = GetOwnerEntity();
 	if ( pOwner )
@@ -4141,11 +4147,21 @@ void CBaseEntity::InputKill( inputdata_t &inputdata )
 		SetOwnerEntity( NULL );
 	}
 
-	UTIL_Remove( this );
+	if (IsPlayer())
+    {
+        // never just delete players
+        engine->ServerCommand(UTIL_VarArgs("kickid %d CBaseEntity::InputKill()\n", engine->GetPlayerUserId(edict())));
+    }
+    else
+    {
+        UTIL_Remove(this);
+    }
 }
 
 void CBaseEntity::InputKillHierarchy( inputdata_t &inputdata )
 {
+    m_OnKilled.FireOutput(inputdata.pActivator, this);
+
 	CBaseEntity *pChild, *pNext;
 	for ( pChild = FirstMoveChild(); pChild; pChild = pNext )
 	{
@@ -4161,7 +4177,15 @@ void CBaseEntity::InputKillHierarchy( inputdata_t &inputdata )
 		SetOwnerEntity( NULL );
 	}
 
-	UTIL_Remove( this );
+	if (IsPlayer())
+    {
+        // never just delete players
+        engine->ServerCommand(UTIL_VarArgs("kickid %d CBaseEntity::InputKill()\n", engine->GetPlayerUserId(edict())));
+    }
+    else
+    {
+        UTIL_Remove(this);
+    }
 }
 
 //------------------------------------------------------------------------------
@@ -6498,6 +6522,15 @@ void CBaseEntity::InputAddContext( inputdata_t& inputdata )
 	AddContext( contextName );
 }
 
+//-----------------------------------------------------------------------------
+// Purpose:
+// Input  : inputdata -
+//-----------------------------------------------------------------------------
+void CBaseEntity::InputIncrementContext(inputdata_t &inputdata)
+{
+    const char *contextName = inputdata.value.String();
+    AddContext(contextName, true);
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: User inputs. These fire the corresponding user outputs, and are
@@ -6535,41 +6568,49 @@ void CBaseEntity::InputFireUser4( inputdata_t& inputdata )
 
 
 //-----------------------------------------------------------------------------
-// Purpose: 
-// Input  : *contextName - 
+// Purpose:
+// Input  : *contextName -
 //-----------------------------------------------------------------------------
-void CBaseEntity::AddContext( const char *contextName )
+void CBaseEntity::AddContext(const char *contextName, bool increment)
 {
-	char key[ 128 ];
-	char value[ 128 ];
-	float duration;
+    char key[128];
+    char value[128];
+    float duration;
 
-	const char *p = contextName;
-	while ( p )
-	{
-		duration = 0.0f;
-		p = SplitContext( p, key, sizeof( key ), value, sizeof( value ), &duration );
-		if ( duration )
-		{
-			duration += gpGlobals->curtime;
-		}
+    const char *p = contextName;
+    while (p)
+    {
+        duration = 0.0f;
+        p = SplitContext(p, key, sizeof(key), value, sizeof(value), &duration);
+        if (duration)
+        {
+            duration += gpGlobals->curtime;
+        }
 
-		int iIndex = FindContextByName( key );
-		if ( iIndex != -1 )
-		{
-			// Set the existing context to the new value
-			m_ResponseContexts[iIndex].m_iszValue = AllocPooledString( value );
-			m_ResponseContexts[iIndex].m_fExpirationTime = duration;
-			continue;
-		}
+        int iIndex = FindContextByName(key);
+        if (iIndex != -1)
+        {
+            // Set the existing context to the new value, or increment if requested
+            if (increment)
+            {
+                int iValue = atoi(value) + atoi(m_ResponseContexts[iIndex].m_iszValue.ToCStr());
+                Q_snprintf(value, 128, "%d", iValue);
+                m_ResponseContexts[iIndex].m_iszValue = AllocPooledString(value);
+            }
+            else
+                m_ResponseContexts[iIndex].m_iszValue = AllocPooledString(value);
 
-		ResponseContext_t newContext;
-		newContext.m_iszName = AllocPooledString( key );
-		newContext.m_iszValue = AllocPooledString( value );
-		newContext.m_fExpirationTime = duration;
+            m_ResponseContexts[iIndex].m_fExpirationTime = duration;
+            continue;
+        }
 
-		m_ResponseContexts.AddToTail( newContext );
-	}
+        ResponseContext_t newContext;
+        newContext.m_iszName = AllocPooledString(key);
+        newContext.m_iszValue = AllocPooledString(value);
+        newContext.m_fExpirationTime = duration;
+
+        m_ResponseContexts.AddToTail(newContext);
+    }
 }
 
 //-----------------------------------------------------------------------------

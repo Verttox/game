@@ -10,6 +10,7 @@
 #include <globalvars_base.h>
 #include <cdll_util.h>
 #include <KeyValues.h>
+#include "hud.h"
 
 #include "spectatorgui.h"
 
@@ -21,14 +22,9 @@
 #include <vgui_controls/MenuItem.h>
 #include <vgui_controls/TextImage.h>
 
-#include <stdio.h> // _snprintf define
-
 #include <game/client/iviewport.h>
 #include "commandmenu.h"
 #include "hltvcamera.h"
-#if defined( REPLAY_ENABLED )
-#include "replay/replaycamera.h"
-#endif
 
 #include <vgui_controls/TextEntry.h>
 #include <vgui_controls/Panel.h>
